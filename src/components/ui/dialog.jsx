@@ -18,10 +18,11 @@ const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
     )}
-    {...props} />
+    {...props} 
+  />
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
@@ -29,15 +30,16 @@ const DialogContent = React.forwardRef(({ className, children, ...props }, ref) 
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
-  ref={ref}
-  onInteractOutside={(e) => e.preventDefault()}
-  onEscapeKeyDown={(e) => e.preventDefault()}
-  className={cn(
-    "fixed left-[50%] top-[50%] z-[9998] grid w-full max-w-3xl [&>button]:hidden translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
-    className
-  )}
-  {...props}
->
+      ref={ref}
+      onInteractOutside={(e) => e.preventDefault()}
+      onEscapeKeyDown={(e) => e.preventDefault()}
+      className={cn(
+        // 🟢 แก้ไขจุดนี้: ใช้ w-[92%] บนมือถือ และเพิ่ม max-h-[88vh] overflow-y-auto เพื่อให้ยืดหยุ่นและมีแถบเลื่อนอัตโนมัติ
+        "fixed left-[50%] top-[50%] z-[9998] grid w-[92%] sm:w-full max-w-3xl max-h-[88vh] overflow-y-auto [&>button]:hidden translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
+        className
+      )}
+      {...props}
+    >
       {children}
       <DialogPrimitive.Close
         className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
@@ -55,7 +57,8 @@ const DialogHeader = ({
 }) => (
   <div
     className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)}
-    {...props} />
+    {...props} 
+  />
 )
 DialogHeader.displayName = "DialogHeader"
 
@@ -65,7 +68,8 @@ const DialogFooter = ({
 }) => (
   <div
     className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)}
-    {...props} />
+    {...props} 
+  />
 )
 DialogFooter.displayName = "DialogFooter"
 
@@ -73,7 +77,8 @@ const DialogTitle = React.forwardRef(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
     className={cn("text-lg font-semibold leading-none tracking-tight", className)}
-    {...props} />
+    {...props} 
+  />
 ))
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
@@ -81,7 +86,8 @@ const DialogDescription = React.forwardRef(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
     className={cn("text-sm text-muted-foreground", className)}
-    {...props} />
+    {...props} 
+  />
 ))
 DialogDescription.displayName = DialogPrimitive.Description.displayName
 

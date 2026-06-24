@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Plus, Search, Pencil, Trash2, Wrench, Filter } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Wrench, Filter, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -32,22 +32,30 @@ const emptyForm = {
 
 export default function Repair() {
   const [repairs, setRepairs] = useState([]);
+  const [devices, setDevices] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [errors, setErrors] = useState({}); 
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
 
-  const load = async () => {
-    const { data } = await supabase.from('repairs').select('*').order('created_at', { ascending: false });
-    setRepairs(data || []);
+  const loadData = async () => {
+    setLoading(true);
+    const [repairsRes, devicesRes] = await Promise.all([
+      supabase.from('repairs').select('*').order('created_at', { ascending: false }),
+      supabase.from('devices').select('id, asset_tag, name') 
+    ]);
+
+    setRepairs(repairsRes.data || []);
+    setDevices(devicesRes.data || []);
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { loadData(); }, []);
 
   const filtered = repairs.filter(r => {
     const matchSearch = !search || r.device_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -57,20 +65,33 @@ export default function Repair() {
     return matchSearch && matchStatus;
   });
 
-  const openAdd = () => { setEditItem(null); setForm(emptyForm); setDialogOpen(true); };
-  const openEdit = (item) => { setEditItem(item); setForm({ ...emptyForm, ...item }); setDialogOpen(true); };
+  const openAdd = () => { setEditItem(null); setErrors({}); setForm(emptyForm); setDialogOpen(true); };
+  const openEdit = (item) => { setEditItem(item); setErrors({}); setForm({ ...emptyForm, ...item }); setDialogOpen(true); };
+
+  const validateForm = () => {
+    const localErrors = {};
+    if (!form.device_id) localErrors.device_id = "กรุณาเลือกอุปกรณ์";
+    if (!form.issue_description || form.issue_description.trim() === "") {
+      localErrors.issue_description = "กรุณากรอกอาการเสีย";
+    }
+    setErrors(localErrors);
+    return Object.keys(localErrors).length === 0;
+  };
 
   const handleSave = async () => {
+    if (!validateForm()) return; 
+
     setSaving(true);
     const payload = { ...form, repair_cost: form.repair_cost ? Number(form.repair_cost) : null };
     if (!payload.reported_date) payload.reported_date = null;
     if (!payload.completed_date) payload.completed_date = null;
+
     if (editItem) {
       await supabase.from('repairs').update(payload).eq('id', editItem.id);
     } else {
       await supabase.from('repairs').insert(payload);
     }
-    await load();
+    await loadData();
     setDialogOpen(false);
     setSaving(false);
   };
@@ -78,7 +99,19 @@ export default function Repair() {
   const handleDelete = async (id) => {
     await supabase.from('repairs').delete().eq('id', id);
     setDeleteId(null);
-    await load();
+    await loadData();
+  };
+
+  const handleDeviceChange = (deviceId) => {
+    const selectedDevice = devices.find(d => d.id === deviceId);
+    if (selectedDevice) {
+      setForm(f => ({
+        ...f,
+        device_id: deviceId,
+        device_name: `${selectedDevice.name} (${selectedDevice.asset_tag})` 
+      }));
+      setErrors(prev => ({ ...prev, device_id: "" }));
+    }
   };
 
   return (
@@ -141,7 +174,12 @@ export default function Repair() {
                   return (
                     <tr key={r.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{r.ticket_no || '—'}</td>
-                      <td className="px-4 py-3 font-medium text-foreground">{r.device_name}</td>
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        <div>{r.device_name}</div>
+                        {r.notes && r.status === 'Cancelled' && (
+                          <div className="text-[11px] text-red-500 font-medium truncate max-w-xs">{r.notes}</div>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">{r.issue_description}</td>
                       <td className="px-4 py-3 text-muted-foreground">{r.reported_by || '—'}</td>
                       <td className="px-4 py-3">
@@ -173,56 +211,135 @@ export default function Repair() {
         </div>
       )}
 
+      {/* 📐 Dialog เพิ่ม/แก้ไขข้อมูล: สไตล์ Compact ล็อกความสูง ปิดสกรอลล์บาร์ ไม่ดีดเนื้อหา */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editItem ? 'แก้ไขงานซ่อม' : 'เพิ่มงานซ่อมใหม่'}</DialogTitle>
+        <DialogContent className="max-w-2xl bg-background border shadow-xl sm:rounded-2xl p-5 flex flex-col overflow-hidden">
+          <DialogHeader className="border-b pb-3 shrink-0">
+            <DialogTitle className="text-base font-bold text-foreground">{editItem ? 'แก้ไขงานซ่อม' : 'เพิ่มงานซ่อมใหม่'}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 mt-2">
-            {[
-              { key: 'ticket_no', label: 'เลขที่ใบแจ้งซ่อม' },
-              { key: 'device_name', label: 'ชื่ออุปกรณ์ *' },
-              { key: 'reported_by', label: 'ผู้แจ้ง' },
-              { key: 'technician', label: 'ช่างซ่อม' },
-              { key: 'repair_cost', label: 'ค่าซ่อม (บาท)', type: 'number' },
-              { key: 'reported_date', label: 'วันที่แจ้ง', type: 'date' },
-              { key: 'completed_date', label: 'วันที่ซ่อมเสร็จ', type: 'date' },
-            ].map(({ key, label, type = 'text' }) => (
-              <div key={key} className="space-y-1.5">
-                <Label className="text-xs">{label}</Label>
-                <Input type={type} value={form[key] || ''} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))} />
+          
+          <div className="flex-1 my-3 overflow-hidden w-full">
+            <div className="grid grid-cols-2 gap-x-5 gap-y-0.5">
+              
+              {/* แถวที่ 1: เลขที่ใบแจ้งซ่อม */}
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold text-foreground/80">เลขที่ใบแจ้งซ่อม</Label>
+                <Input placeholder="เช่น REPAIR-2026-001" value={form.ticket_no || ''} onChange={e => setForm(f => ({ ...f, ticket_no: e.target.value }))} className="h-8 text-xs rounded-md" />
+                <div className="min-h-[16px]" /> 
               </div>
-            ))}
-            <div className="space-y-1.5">
-              <Label className="text-xs">ความเร่งด่วน</Label>
-              <Select value={form.priority} onValueChange={v => setForm(f => ({ ...f, priority: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{priorities.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">สถานะ</Label>
-              <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{statuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-2 space-y-1.5">
-              <Label className="text-xs">อาการเสีย *</Label>
-              <Input value={form.issue_description || ''} onChange={e => setForm(f => ({ ...f, issue_description: e.target.value }))} />
-            </div>
-            <div className="col-span-2 space-y-1.5">
-              <Label className="text-xs">หมายเหตุ</Label>
-              <Input value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+
+              {/* 🛠️ แถวที่ 1 (ขวา): ดึงข้อมูลจากตาราง Device มาเป็น Dropdown */}
+              <div className="space-y-1">
+                <Label className={`text-[11px] font-bold ${errors.device_id ? "text-red-500" : "text-foreground/80"}`}>เลือกอุปกรณ์จากระบบ *</Label>
+                <Select value={form.device_id || ""} onValueChange={handleDeviceChange}>
+                  <SelectTrigger className={`h-8 text-xs rounded-md ${errors.device_id ? "border-red-500 text-red-500 bg-red-50/20" : ""}`}>
+                    <SelectValue placeholder="เลือกอุปกรณ์ในระบบ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {devices.map(d => (
+                      <SelectItem key={d.id} value={d.id} className="text-xs">
+                        {d.name} ({d.asset_tag})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.device_id && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.device_id}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* แถวที่ 2: ผู้แจ้ง | ช่างซ่อม */}
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold text-foreground/80">ผู้แจ้ง</Label>
+                <Input value={form.reported_by || ''} onChange={e => setForm(f => ({ ...f, reported_by: e.target.value }))} className="h-8 text-xs rounded-md" />
+                <div className="min-h-[16px]" />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold text-foreground/80">ช่างซ่อม</Label>
+                <Input value={form.technician || ''} onChange={e => setForm(f => ({ ...f, technician: e.target.value }))} className="h-8 text-xs rounded-md" />
+                <div className="min-h-[16px]" />
+              </div>
+
+              {/* แถวที่ 3: ค่าซ่อม | ความเร่งด่วน */}
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold text-foreground/80">ค่าซ่อม (บาท)</Label>
+                <Input type="number" value={form.repair_cost || ''} onChange={e => setForm(f => ({ ...f, repair_cost: e.target.value }))} className="h-8 text-xs rounded-md" />
+                <div className="min-h-[16px]" />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold text-foreground/80">ความเร่งด่วน</Label>
+                <Select value={form.priority} onValueChange={v => setForm(f => ({ ...f, priority: v }))}>
+                  <SelectTrigger className="h-8 text-xs rounded-md"><SelectValue /></SelectTrigger>
+                  <SelectContent>{priorities.map(p => <SelectItem key={p} value={p} className="text-xs">{p}</SelectItem>)}</SelectContent>
+                </Select>
+                <div className="min-h-[16px]" />
+              </div>
+
+              {/* แถวที่ 4: วันที่แจ้ง | วันที่ซ่อมเสร็จ */}
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold text-foreground/80">วันที่แจ้ง</Label>
+                <Input type="date" value={form.reported_date || ''} onChange={e => setForm(f => ({ ...f, reported_date: e.target.value }))} className="h-8 text-xs rounded-md font-mono" />
+                <div className="min-h-[16px]" />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold text-foreground/80">วันที่ซ่อมเสร็จ</Label>
+                <Input type="date" value={form.completed_date || ''} onChange={e => setForm(f => ({ ...f, completed_date: e.target.value }))} className="h-8 text-xs rounded-md font-mono" />
+                <div className="min-h-[16px]" />
+              </div>
+
+              {/* แถวที่ 5: สถานะ */}
+              <div className="space-y-1">
+                <Label className="text-[11px] font-bold text-foreground/80">สถานะ</Label>
+                <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
+                  <SelectTrigger className="h-8 text-xs rounded-md"><SelectValue /></SelectTrigger>
+                  <SelectContent>{statuses.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
+                </Select>
+                <div className="min-h-[16px]" />
+              </div>
+              <div className="min-h-[1px]" />
+
+              {/* แถวที่ 6: อาการเสีย */}
+              <div className="col-span-2 space-y-1">
+                <Label className={`text-[11px] font-bold ${errors.issue_description ? "text-red-500" : "text-foreground/80"}`}>อาการเสีย *</Label>
+                <Input value={form.issue_description || ''} onChange={e => setForm(f => ({ ...f, issue_description: e.target.value }))} className={`h-8 text-xs rounded-md ${errors.issue_description ? "border-red-500 bg-red-50/20" : ""}`} />
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.issue_description && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.issue_description}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* แถวที่ 7: หมายเหตุ */}
+              <div className="col-span-2 space-y-1">
+                <Label className="text-[11px] font-bold text-foreground/80">หมายเหตุ</Label>
+                <Input value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="h-8 text-xs rounded-md" />
+                <div className="min-h-[12px]" />
+              </div>
+
             </div>
           </div>
-          <div className="flex justify-end gap-3 mt-4">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleSave} disabled={saving}>{saving ? 'กำลังบันทึก...' : 'บันทึก'}</Button>
+
+          <div className="flex justify-end gap-2 border-t pt-3 shrink-0">
+            <Button variant="outline" className="h-8 text-xs rounded-lg px-4" onClick={() => setDialogOpen(false)}>ยกเลิก</Button>
+            <Button className="h-8 text-xs rounded-lg px-5 bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleSave} disabled={saving}>
+              {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Dialog ยืนยันการลบ */}
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>ยืนยันการลบ</DialogTitle></DialogHeader>

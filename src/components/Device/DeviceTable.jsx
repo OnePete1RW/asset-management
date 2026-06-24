@@ -1,5 +1,5 @@
 import React from 'react';
-import { Monitor, Eye, Pencil, Trash2, CalendarDays, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Monitor, Eye, Trash2, CalendarDays, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function DeviceTable({
@@ -7,7 +7,6 @@ export default function DeviceTable({
   filtered,
   statusColors,
   setDetailItem,
-  openEdit,
   setDeleteId
 }) {
   // สถานะกำลังโหลด
@@ -127,14 +126,9 @@ export default function DeviceTable({
                       >
                         <Eye size={14} />
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => openEdit(d)}
-                      >
-                        <Pencil size={14} />
-                      </Button>
+                      
+                      {/* 🔴 นำปุ่มดินสอ (Edit) ออกเรียบร้อยแล้ว */}
+
                       <Button
                         variant="ghost"
                         size="icon"

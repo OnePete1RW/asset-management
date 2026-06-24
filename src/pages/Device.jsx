@@ -5,37 +5,41 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import DeviceTable from '@/components/Device/DeviceTable';
 import DeviceFormDialog from '@/components/Device/DeviceFormDialog';
-import DeviceEditDialog from '@/components/Device/DeviceEditDialog';
 import CloseConfirmDialog from '@/components/Device/CloseConfirmDialog';
 import DeviceDetailDialog from '@/components/Device/DeviceDetailDialog';
 import DeleteConfirmDialog from '@/components/Device/DeleteConfirmDialog';
 import { Plus, Search, Filter } from "lucide-react";
 
+// 🟢 1. ชุดสีพาสเทลสำหรับสถานะต่างๆ บนตารางหลัก
 const statusColors = {
   'ใช้งาน': { 
-    bg: '#E0F2FE',    // สีฟ้าพาสเทลนุ่มนวล (Sky Blue) - ดูเคลียร์ ปลอดภัย กำลังใช้งาน
+    bg: '#E0F2FE',    // สีฟ้าพาสเทล
     color: '#000000' 
   },
   'สำรอง': { 
-    bg: '#DCFCE7',    // สีเขียวมินต์อ่อน (Mint Green) - พร้อมสแตนด์บาย ชื่นใจ
+    bg: '#DCFCE7',    // สีเขียวมินต์อ่อน
     color: '#000000' 
   },
   'กำลังซ่อม': { 
-    bg: '#FEF3C7',    // สีเหลืองอำพัน/ส้มอ่อน (Amber Yellow) - เตือนระวัง กำลังดำเนินการ
+    bg: '#FEF3C7',    // สีเหลืองอำพัน
     color: '#000000' 
   },
+  'รออนุมัติส่งซ่อม': { 
+    bg: '#FFE4E6',    // สีแดงกุหลาบอ่อนพาสเทล (Rose)
+    color: '#9F1239' 
+  },
   'ยืม': { 
-    bg: '#F3E8FF',    // สีม่วงลาเวนเดอร์ (Lavender Purple) - มีความเคลื่อนไหว มีคนยืมไป
+    bg: '#F3E8FF',    // สีม่วงลาเวนเดอร์
     color: '#000000' 
   },
   'เสีย': { 
-    bg: '#F1F5F9',    // สีเทาอ่อนคลาสสิก (Slate Gray) - อุปกรณ์นิ่ง ไม่ทำงานแล้ว
+    bg: '#F1F5F9',    // สีเทาอ่อน
     color: '#000000' 
   },
 };
 
 const categories = ['Laptop', 'Desktop', 'Monitor', 'Printer', 'Network', 'Server', 'Mobile', 'Tablet', 'Other'];
-const statuses = ['สำรอง', 'ใช้งาน', 'กำลังซ่อม', 'ยืม', 'เสีย'];
+const statuses = ['สำรอง', 'ใช้งาน', 'รออนุมัติส่งซ่อม', 'กำลังซ่อม', 'ยืม', 'เสีย'];
 const departments = [
   "Management", "Human Resources", "Admin", "Accounting", "Finance", 
   "Information Technology", "Sales", "Modern & Online Trade", 
@@ -66,10 +70,9 @@ export default function Device() {
   const [detailItem, setDetailItem] = useState(null);
   const [focusField, setFocusField] = useState("");
   const [filterDepartment, setFilterDepartment] = useState("all");
-  const [imageSrc, setImageSrc] = useState(null);
-  const [setCropDialogOpen] = useState(false); // แก้ไขเพิ่มเติมหากต้องการผูกหน้า crop
 
   const load = async () => {
+    setLoading(true);
     const { data } = await supabase.from('devices').select('*').order('created_at', { ascending: false });
     setDevices(data || []);
     setLoading(false);
@@ -100,7 +103,6 @@ export default function Device() {
 
   const openEdit = (item) => {
     setEditItem(item);
-    // ✨ ฝังค่าดั้งเดิมลงไปใน form object เพื่อให้หน้าต่าง Edit นำไปเช็กความเปลี่ยนแปลงได้
     setForm({
       ...emptyForm,
       ...item,
@@ -171,7 +173,6 @@ export default function Device() {
     await load();
   };
 
- 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -184,7 +185,6 @@ export default function Device() {
         </Button>
       </div>
 
-      {/* ✅ แก้ไขโครงสร้างกล่องค้นหาและ Filter แยกออกจากกันอย่างถูกต้อง */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-48">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -228,42 +228,23 @@ export default function Device() {
         />
       </div>
 
-      {/* คอมโพเนนต์ฟอร์มกรอกข้อมูล */}
-      {editItem ? (
-        <DeviceEditDialog
-          isOpen={dialogOpen}
-          setIsOpen={setDialogOpen}
-          form={form}
-          setForm={setForm}
-          errors={errors}
-          setErrors={setErrors}
-          focusField={focusField}
-          setFocusField={setFocusField}
-          saving={saving}
-          handleSave={handleSave}
-          setCloseConfirmOpen={setCloseConfirmOpen}
-          categories={categories}
-          statuses={statuses}
-          departments={departments}
-        />
-      ) : (
-        <DeviceFormDialog
-          isOpen={dialogOpen}
-          setIsOpen={setDialogOpen}
-          form={form}
-          setForm={setForm}
-          errors={errors}
-          setErrors={setErrors}
-          focusField={focusField}
-          setFocusField={setFocusField}
-          saving={saving}
-          handleSave={handleSave}
-          setCloseConfirmOpen={setCloseConfirmOpen}
-          categories={categories}
-          statuses={statuses}
-          departments={departments}
-        />
-      )}
+      {/* 🟢 แก้ไขตรงนี้: เรียกใช้ฟอร์มกรอกข้อมูลหลักโดยตรงโดยไม่ต้องเช็คเงื่อนไข DeviceEditDialog แล้ว */}
+      <DeviceFormDialog
+        isOpen={dialogOpen}
+        setIsOpen={setDialogOpen}
+        form={form}
+        setForm={setForm}
+        errors={errors}
+        setErrors={setErrors}
+        focusField={focusField}
+        setFocusField={setFocusField}
+        saving={saving}
+        handleSave={handleSave}
+        setCloseConfirmOpen={setCloseConfirmOpen}
+        categories={categories}
+        statuses={statuses}
+        departments={departments}
+      />
 
       {/* หน้าต่างแจ้งเตือนอื่น ๆ */}
       <CloseConfirmDialog

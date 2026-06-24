@@ -2,7 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
-
+import Approve from './pages/Approve';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Device from './pages/Device';
@@ -22,6 +22,7 @@ function App() {
           <Route path="/device" element={<Device />} />
           <Route path="/repair" element={<Repair />} />
           <Route path="/rent" element={<Rent />} />
+          <Route path="/approve" element={<Approve />} />
         </Route>
       </Route>
 

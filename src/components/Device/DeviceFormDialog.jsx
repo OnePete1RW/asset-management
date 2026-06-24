@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { supabase } from '@/lib/supabase'; 
-import ImageCropDialog from './ImageCropDialog'; 
+import { supabase } from '@/lib/supabase';
+import ImageCropDialog from './ImageCropDialog';
 import ImageUploader from './ImageUploader';
+import { Laptop, AlertCircle } from 'lucide-react';
 
 export default function DeviceFormDialog({
   isOpen,
@@ -18,20 +19,18 @@ export default function DeviceFormDialog({
   focusField,
   setFocusField,
   saving,
-  handleSave, 
+  handleSave,
   setCloseConfirmOpen,
   categories,
   statuses,
   departments
 }) {
-  // สเตตัสสำหรับหน้าต่างตัดรูปภาพ
   const [imageSrc, setImageSrc] = useState(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
 
-  // ฟังก์ชันเมื่อเลือกรูปหรือลากรูปมาวาง
   const handleImageChangeLocal = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -44,7 +43,6 @@ export default function DeviceFormDialog({
     reader.readAsDataURL(file);
   };
 
-  // ฟังก์ชันคำนวณการตัดรูปภาพพิกเซลจริง และส่งเข้า Supabase
   const saveCropLocal = async () => {
     if (!croppedAreaPixels || !imageSrc) return;
 
@@ -90,7 +88,6 @@ export default function DeviceFormDialog({
     };
   };
 
-  // 🛠️ ฟังก์ชันตรวจสอบข้อมูลอย่างละเอียด "ครบทุกฟิลด์"
   const validateAndSave = () => {
     const localErrors = {};
 
@@ -101,13 +98,13 @@ export default function DeviceFormDialog({
       localErrors.name = "กรุณากรอกชื่ออุปกรณ์";
     }
     if (!form.category || form.category.trim() === "") {
-      localErrors.category = "กรุณาเลือกประเภทอุปกรณ์";
+      localErrors.category = "กรุณาเลือกประเภท";
     }
     if (!form.status || form.status.trim() === "") {
       localErrors.status = "กรุณาเลือกสถานะ";
     }
     if (!form.assigned_to || form.assigned_to.trim() === "") {
-      localErrors.assigned_to = "กรุณากรอกผู้รับผิดชอบ";
+      localErrors.assigned_to = "กรุณากรอกผู้รับมอบหมาย";
     }
     if (!form.department || form.department.trim() === "") {
       localErrors.department = "กรุณาเลือกแผนก";
@@ -118,21 +115,20 @@ export default function DeviceFormDialog({
       const expire = new Date(form.warranty_expire);
 
       if (purchase > expire) {
-        localErrors.warranty_expire = "วันหมดประกันต้องอยู่หลังจากวันที่ซื้อ";
+        localErrors.warranty_expire = "วันหมดประกันไม่ถูกต้อง";
       }
     }
 
     if (Object.keys(localErrors).length > 0) {
       setErrors(localErrors);
-      return; 
+      return;
     }
 
     handleSave();
   };
 
-  // 🧹 ฟังก์ชันจัดการเมื่อกดยกเลิก เพื่อปิดฟอร์มและล้างประวัติ Error ออกให้เกลี้ยง
   const handleCancel = () => {
-    setErrors({}); // ล้างแจ้งเตือนสีแดงทั้งหมด
+    setErrors({});
     const hasData = Object.values(form).some(value => value && value.toString().trim() !== "");
     if (hasData) {
       setCloseConfirmOpen(true);
@@ -146,184 +142,207 @@ export default function DeviceFormDialog({
       open={isOpen}
       onOpenChange={(open) => {
         if (!open) {
-          setErrors({}); // ล้าง Error ทันทีเมื่อ Dialog ถูกสั่งปิด
+          setErrors({});
           setCloseConfirmOpen(true);
         }
       }}
     >
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>เพิ่มอุปกรณ์ใหม่</DialogTitle>
+      {/* ล็อกหน้าตายตัว ห้ามมี scrollbar (overflow-hidden) */}
+      <DialogContent className="max-w-2xl bg-background border shadow-xl sm:rounded-2xl p-5 flex flex-col overflow-hidden">
+
+        {/* ส่วนหัว */}
+        <DialogHeader className="border-b pb-3 shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-base font-bold tracking-tight text-foreground">
+            <div className="p-1 bg-primary/10 rounded-lg text-primary border shadow-sm">
+              <Laptop size={15} />
+            </div>
+            <span>เพิ่มอุปกรณ์ใหม่</span>
+          </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 mt-4">
-          <div>
-            <ImageUploader 
-              imageUrl={form.image_url} 
-              onImageChange={handleImageChangeLocal} 
-            />
-          </div>
+        {/* ส่วนเนื้อหาฟอร์มจัดสไตล์ตามรูปภาพตัวอย่าง */}
+        <div className="flex-1 my-3 space-y-4 overflow-hidden w-full">
 
-          {/* Row 1 */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <Label className={errors.asset_tag ? "text-red-500" : ""}>รหัสอุปกรณ์</Label>
-              <Input
-                value={form.asset_tag || ""}
-                placeholder={focusField === "asset_tag" ? "" : errors.asset_tag ? errors.asset_tag : "เช่น ASSET-001"}
-                className={errors.asset_tag ? "border-red-500 placeholder:text-red-500" : ""}
-                onFocus={() => {
-                  setFocusField("asset_tag");
-                  setErrors(prev => ({ ...prev, asset_tag: "" }));
-                }}
-                onBlur={() => setFocusField("")}
-                onChange={(e) => setForm(f => ({ ...f, asset_tag: e.target.value }))}
+          {/* ส่วนอัปโหลดรูปภาพ (ปรับขนาดและลด Padding ให้ตรงตามแบบ) */}
+          <div className="flex flex-col items-center justify-center bg-muted/5 py-3 px-4 rounded-xl border border-dashed w-full max-h-[120px]">
+            <div className="scale-90 transform origin-center">
+              <ImageUploader
+                imageUrl={form.image_url}
+                onImageChange={handleImageChangeLocal}
               />
-              {/* 🏷️ จองพื้นที่แจ้งเตือนความสูงคงที่ (min-h-[20px]) ป้องกัน UI กระตุก */}
-              <div className="min-h-[20px] mt-1">
-                {errors.asset_tag && <p className="text-[11px] text-red-500">{errors.asset_tag}</p>}
-              </div>
-            </div>
-
-            <div>
-              <Label className={errors.name ? "text-red-500" : ""}>ชื่ออุปกรณ์</Label>
-              <Input
-                value={form.name || ""}
-                placeholder={focusField === "name" ? "" : errors.name ? errors.name : "เช่น Laptop Dell XPS 13"}
-                className={errors.name ? "border-red-500 placeholder:text-red-500" : ""}
-                onFocus={() => {
-                  setFocusField("name");
-                  setErrors(prev => ({ ...prev, name: "" }));
-                }}
-                onBlur={() => setFocusField("")}
-                onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
-              />
-              <div className="min-h-[20px] mt-1">
-                {errors.name && <p className="text-[11px] text-red-500">{errors.name}</p>}
-              </div>
             </div>
           </div>
 
-          {/* Row 2 */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <Label className={errors.category ? "text-red-500" : ""}>ประเภท</Label>
-              <Select 
-                value={form.category || ""} 
-                onValueChange={(v) => {
-                  setForm(f => ({ ...f, category: v }));
-                  setErrors(prev => ({ ...prev, category: "" }));
-                }}
-              >
-                <SelectTrigger className={errors.category ? "border-red-500 text-red-500 focus:ring-red-500" : ""}>
-                  <SelectValue placeholder={errors.category ? errors.category : "ประเภท"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <div className="min-h-[20px] mt-1">
-                {errors.category && <p className="text-[11px] text-red-500">{errors.category}</p>}
-              </div>
-            </div>
+          {/* แผงกรอกข้อมูลหลัก (ยุบรวมกรอบเดียว ไร้การ์ดแยกซ้อน เพื่อความคลีน) */}
+          <div className="bg-background rounded-xl border p-4 shadow-sm w-full">
+            <div className="grid grid-cols-2 gap-x-5 gap-y-1">
 
-            <div>
-              <Label className={errors.status ? "text-red-500" : ""}>สถานะ</Label>
-              <Select 
-                value={form.status || ""} 
-                onValueChange={(v) => {
-                  setForm(f => ({ ...f, status: v }));
-                  setErrors(prev => ({ ...prev, status: "" }));
-                }}
-              >
-                <SelectTrigger className={errors.status ? "border-red-500 text-red-500 focus:ring-red-500" : ""}>
-                  <SelectValue placeholder={errors.status ? errors.status : "สถานะ"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {statuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <div className="min-h-[20px] mt-1">
-                {errors.status && <p className="text-[11px] text-red-500">{errors.status}</p>}
+              {/* แถวที่ 1: รหัสอุปกรณ์ | ชื่ออุปกรณ์ */}
+              <div className="w-full">
+                <Label className={`text-[11px] font-bold ${errors.asset_tag ? "text-red-500" : "text-foreground/80"}`}>รหัสอุปกรณ์</Label>
+                <Input
+                  value={form.asset_tag || ""}
+                  placeholder={focusField === "asset_tag" ? "" : errors.asset_tag ? errors.asset_tag : "เช่น ASSET-001"}
+                  className={`mt-1 h-8 text-xs rounded-md transition-colors ${errors.asset_tag ? "border-red-500 bg-red-50/20 placeholder:text-red-400 focus-visible:ring-red-500" : ""}`}
+                  onFocus={() => { setFocusField("asset_tag"); setErrors(prev => ({ ...prev, asset_tag: "" })); }}
+                  onBlur={() => setFocusField("")}
+                  onChange={(e) => setForm(f => ({ ...f, asset_tag: e.target.value }))}
+                />
+                {/* 🔴 จองพื้นที่สำหรับแจ้งเตือนช่องว่างคงที่ (min-h-[16px]) */}
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.asset_tag && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.asset_tag}</p>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Row 3 & 4 */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <Label className={errors.assigned_to ? "text-red-500" : ""}>มอบหมาย</Label>
-              <Input
-                value={form.assigned_to || ""}
-                placeholder={focusField === "assigned_to" ? "" : errors.assigned_to ? errors.assigned_to : "เช่น น.ส. ปัญญา ใจดี"}
-                className={errors.assigned_to ? "border-red-500 placeholder:text-red-500" : ""}
-                onFocus={() => {
-                  setFocusField("assigned_to");
-                  setErrors(prev => ({ ...prev, assigned_to: "" }));
-                }}
-                onBlur={() => setFocusField("")}
-                onChange={(e) => setForm(f => ({ ...f, assigned_to: e.target.value }))}
-              />
-              <div className="min-h-[20px] mt-1">
-                {errors.assigned_to && <p className="text-[11px] text-red-500">{errors.assigned_to}</p>}
+              <div className="w-full">
+                <Label className={`text-[11px] font-bold ${errors.name ? "text-red-500" : "text-foreground/80"}`}>ชื่ออุปกรณ์</Label>
+                <Input
+                  value={form.name || ""}
+                  placeholder={focusField === "name" ? "" : errors.name ? errors.name : "เช่น Laptop Dell XPS 13"}
+                  className={`mt-1 h-8 text-xs rounded-md transition-colors ${errors.name ? "border-red-500 bg-red-50/20 placeholder:text-red-400 focus-visible:ring-red-500" : ""}`}
+                  onFocus={() => { setFocusField("name"); setErrors(prev => ({ ...prev, name: "" })); }}
+                  onBlur={() => setFocusField("")}
+                  onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+                />
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.name && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.name}</p>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div>
-              <Label className={errors.department ? "text-red-500" : ""}>แผนก</Label>
-              <Select 
-                value={form.department || ""} 
-                onValueChange={(v) => {
-                  setForm(f => ({ ...f, department: v }));
-                  setErrors(prev => ({ ...prev, department: "" }));
-                }}
-              >
-                <SelectTrigger className={errors.department ? "border-red-500 text-red-500 focus:ring-red-500" : ""}>
-                  <SelectValue placeholder={errors.department ? errors.department : "แผนก"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map(dep => <SelectItem key={dep} value={dep}>{dep}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <div className="min-h-[20px] mt-1">
-                {errors.department && <p className="text-[11px] text-red-500">{errors.department}</p>}
+              {/* แถวที่ 2: สถานะการใช้งาน | ผู้ได้รับมอบหมาย */}
+              <div className="w-full">
+                <Label className={`text-[11px] font-bold ${errors.status ? "text-red-500" : "text-foreground/80"}`}>สถานะการใช้งาน</Label>
+                <div className="mt-1">
+                  <Select value={form.status || ""} onValueChange={(v) => { setForm(f => ({ ...f, status: v })); setErrors(prev => ({ ...prev, status: "" })); }}>
+                    <SelectTrigger className={`h-8 text-xs rounded-md transition-colors ${errors.status ? "border-red-500 bg-red-50/20 text-red-500 focus:ring-red-500" : ""}`}>
+                      <SelectValue placeholder={errors.status ? errors.status : "เลือกสถานะ"} />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg">
+                      {statuses.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.status && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.status}</p>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div>
-              <Label>วันที่ซื้อ</Label>
-              <Input 
-                type="date" 
-                value={form.purchase_date || ""} 
-                onChange={(e) => {
-                  setForm(f => ({ ...f, purchase_date: e.target.value }));
-                  setErrors(prev => ({ ...prev, warranty_expire: "" })); 
-                }} 
-              />
-              {/* บล็อกเปล่ารักษาความสูงสมดุลให้แถวที่ 4 */}
-              <div className="min-h-[20px] mt-1" />
-            </div>
-
-            <div>
-              <Label className={errors.warranty_expire ? "text-red-500" : ""}>วันหมดประกัน</Label>
-              <Input 
-                type="date" 
-                value={form.warranty_expire || ""} 
-                className={errors.warranty_expire ? "border-red-500 text-red-500 focus-visible:ring-red-500" : ""}
-                onChange={(e) => {
-                  setForm(f => ({ ...f, warranty_expire: e.target.value }));
-                  setErrors(prev => ({ ...prev, warranty_expire: "" }));
-                }} 
-              />
-              <div className="min-h-[20px] mt-1">
-                {errors.warranty_expire && <p className="text-[11px] text-red-500">{errors.warranty_expire}</p>}
+              <div className="w-full">
+                <Label className={`text-[11px] font-bold ${errors.assigned_to ? "text-red-500" : "text-foreground/80"}`}>ผู้ได้รับมอบหมาย</Label>
+                <Input
+                  value={form.assigned_to || ""}
+                  placeholder={focusField === "assigned_to" ? "" : errors.assigned_to ? errors.assigned_to : "เช่น น.ส. ปัญญา ใจดี"}
+                  className={`mt-1 h-8 text-xs rounded-md transition-colors ${errors.assigned_to ? "border-red-500 bg-red-50/20 placeholder:text-red-400 focus-visible:ring-red-500" : ""}`}
+                  onFocus={() => { setFocusField("assigned_to"); setErrors(prev => ({ ...prev, assigned_to: "" })); }}
+                  onBlur={() => setFocusField("")}
+                  onChange={(e) => setForm(f => ({ ...f, assigned_to: e.target.value }))}
+                />
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.assigned_to && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.assigned_to}</p>
+                    </>
+                  )}
+                </div>
               </div>
+
+              {/* แถวที่ 3: ประเภทอุปกรณ์ | ฝ่าย / แผนก */}
+              <div className="w-full">
+                <Label className={`text-[11px] font-bold ${errors.category ? "text-red-500" : "text-foreground/80"}`}>ประเภทอุปกรณ์</Label>
+                <div className="mt-1">
+                  <Select value={form.category || ""} onValueChange={(v) => { setForm(f => ({ ...f, category: v })); setErrors(prev => ({ ...prev, category: "" })); }}>
+                    <SelectTrigger className={`h-8 text-xs rounded-md transition-colors ${errors.category ? "border-red-500 bg-red-50/20 text-red-500 focus:ring-red-500" : ""}`}>
+                      <SelectValue placeholder={errors.category ? errors.category : "เลือกประเภท"} />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg">
+                      {categories.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.category && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.category}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="w-full">
+                <Label className={`text-[11px] font-bold ${errors.department ? "text-red-500" : "text-foreground/80"}`}>ฝ่าย / แผนก</Label>
+                <div className="mt-1">
+                  <Select value={form.department || ""} onValueChange={(v) => { setForm(f => ({ ...f, department: v })); setErrors(prev => ({ ...prev, department: "" })); }}>
+                    <SelectTrigger className={`h-8 text-xs rounded-md transition-colors ${errors.department ? "border-red-500 bg-red-50/20 text-red-500 focus:ring-red-500" : ""}`}>
+                      <SelectValue placeholder={errors.department ? errors.department : "เลือกแผนก"} />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg">
+                      {departments.map(dep => <SelectItem key={dep} value={dep} className="text-xs">{dep}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.department && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.department}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* แถวที่ 4: วันที่ซื้ออุปกรณ์ | วันหมดประกัน */}
+              <div className="w-full border-t border-dashed pt-2 mt-1">
+                <Label className="text-[11px] font-bold text-foreground/80 flex items-center gap-1">วันที่ซื้ออุปกรณ์</Label>
+                <Input
+                  type="date"
+                  value={form.purchase_date || ""}
+                  className="mt-1 h-8 text-xs rounded-md focus-visible:ring-primary font-mono"
+                  onChange={(e) => { setForm(f => ({ ...f, purchase_date: e.target.value })); setErrors(prev => ({ ...prev, warranty_expire: "" })); }}
+                />
+                <div className="min-h-[16px]" />
+              </div>
+
+              <div className="w-full border-t border-dashed pt-2 mt-1">
+                <Label className={`text-[11px] font-bold flex items-center gap-1 ${errors.warranty_expire ? "text-red-500" : "text-foreground/80"}`}>วันหมดประกัน</Label>
+                <Input
+                  type="date"
+                  value={form.warranty_expire || ""}
+                  className={`mt-1 h-8 text-xs rounded-md font-mono transition-colors ${errors.warranty_expire ? "border-red-500 bg-red-50/20 text-red-500 focus-visible:ring-red-500" : "focus-visible:ring-primary"}`}
+                  onChange={(e) => { setForm(f => ({ ...f, warranty_expire: e.target.value })); setErrors(prev => ({ ...prev, warranty_expire: "" })); }}
+                />
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.warranty_expire && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.warranty_expire}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
 
-        {/* ส่วนท้ายฟอร์ม */}
-        <div className="flex justify-end items-center gap-3 mt-6 border-t pt-4">
+        {/* ส่วนปุ่มกด Actions ท้ายฟอร์ม (ล็อกแน่น ไม่เลื่อนหาย) */}
+        <div className="flex justify-end items-center gap-2 border-t pt-3 shrink-0">
           <Button
             className="hover:bg-[#111827] hover:text-white"
             variant="outline"
@@ -337,11 +356,15 @@ export default function DeviceFormDialog({
             onClick={validateAndSave}
             disabled={saving}
           >
-            {saving ? "กำลังบันทึก..." : "บันทึก"}
+            {saving ? (
+              <div className="flex items-center gap-1.5">
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-current" />
+                <span>กำลังบันทึก...</span>
+              </div>
+            ) : "บันทึกข้อมูล"}
           </Button>
         </div>
 
-        {/* หน้าต่างย่อยสำหรับแสดงตัวเลื่อนตัดรูป */}
         <ImageCropDialog
           isOpen={cropDialogOpen}
           setIsOpen={setCropDialogOpen}
@@ -353,7 +376,6 @@ export default function DeviceFormDialog({
           onCropComplete={(seededArea, pixels) => setCroppedAreaPixels(pixels)}
           onSave={saveCropLocal}
         />
-
       </DialogContent>
     </Dialog>
   );

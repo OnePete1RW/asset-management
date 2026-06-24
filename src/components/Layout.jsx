@@ -1,8 +1,10 @@
+import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { LayoutDashboard, Monitor, Wrench, PackageOpen, LogOut, Server } from 'lucide-react';
+import { LayoutDashboard, Monitor, Wrench, PackageOpen, LogOut, Server, ClipboardCheck } from 'lucide-react';
 
-const navItems = [
+// เมนูพื้นฐานสำหรับพนักงานทุกคน
+const baseNavItems = [
   { label: 'Dashboard', path: '/', icon: LayoutDashboard },
   { label: 'Device', path: '/device', icon: Monitor },
   { label: 'Repair', path: '/repair', icon: Wrench },
@@ -11,6 +13,39 @@ const navItems = [
 
 export default function Layout() {
   const location = useLocation();
+  const [navItems, setNavItems] = useState(baseNavItems);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const checkUserRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // 🛠️ เงื่อนไขเช็กสิทธิ์แอดมิน (สามารถเปลี่ยนตามโครงสร้างฐานข้อมูลของคุณได้)
+      // ตัวอย่างที่ 1: เช็กจาก metadata ตอนสมัครสมาชิก
+      const userRole = user?.user_metadata?.role; 
+      
+      // ตัวอย่างที่ 2: ถ้าคุณเก็บสิทธิ์ไว้ในตาราง profiles แยกต่างหาก ให้เปิดใช้คอมเมนต์ด้านล่างนี้:
+      /*
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user?.id)
+        .single();
+      const userRole = profile?.role;
+      */
+
+      if (userRole === 'admin' || user?.email === 'admin@yourdomain.com') { // ใส่ fallback เช็กเมลทดสอบได้
+        setIsAdmin(true);
+        // ถ้าเป็นแอดมิน ให้ต่อเมนู "งานรออนุมัติ" เพิ่มเข้าไปใน Sidebar
+        setNavItems([
+          ...baseNavItems,
+          { label: 'งานรออนุมัติ', path: '/approve', icon: ClipboardCheck } // เมนูใหม่สำหรับแอดมิน
+        ]);
+      }
+    };
+
+    checkUserRole();
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -72,7 +107,9 @@ export default function Layout() {
           <h1 className="text-white font-heading font-semibold text-base tracking-wide">Asset Management</h1>
           <div className="ml-auto flex items-center gap-2">
             <span className="w-2 h-2 rounded-full" style={{ background: '#22c55e' }} />
-            <span className="text-xs" style={{ color: 'hsl(var(--sidebar-text))' }}>System Online</span>
+            <span className="text-xs" style={{ color: 'hsl(var(--sidebar-text))' }}>
+              System Online {isAdmin && <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded ml-1 font-bold">ADMIN</span>}
+            </span>
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-6">

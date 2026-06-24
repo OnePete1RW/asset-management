@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/lib/supabase'; // เรียกใช้ supabase สำหรับดึงประวัติ
-import { History, ArrowLeft } from 'lucide-react'; // เพิ่มไอคอนช่วยนำสายตา
+import { supabase } from '@/lib/supabase';
+import { History, ArrowLeft, Monitor, User, Calendar, ShieldCheck, Tag, Info, Clock } from 'lucide-react';
 
 export default function DeviceDetailDialog({ isOpen, setIsOpen, detailItem }) {
   const [showHistory, setShowHistory] = useState(false);
@@ -15,7 +15,6 @@ export default function DeviceDetailDialog({ isOpen, setIsOpen, detailItem }) {
     if (!detailItem?.id) return;
     setLoadingHistory(true);
 
-    // ดึง Log ประวัติการกรอก/แก้ไขจากตาราง device_logs
     const { data, error } = await supabase
       .from('device_logs')
       .select('*')
@@ -30,318 +29,286 @@ export default function DeviceDetailDialog({ isOpen, setIsOpen, detailItem }) {
     setLoadingHistory(false);
   };
 
-  // ดึงประวัติใหม่ทุกครั้งที่กดเปิดดูหน้าต่างประวัติ
   useEffect(() => {
     if (showHistory && detailItem?.id) {
       fetchDeviceHistory();
     }
-  }, [showHistory, detailItem?.id]); // ดักจับที่ id ของอุปกรณ์โดยตรง
+  }, [showHistory, detailItem?.id]);
 
-  // ✨ 2. รีเซ็ตหน้าต่างประวัติเมื่อปิด Dialog หลัก และรีโหลดข้อมูลใหม่เมื่อ Dialog ถูกเปิดขึ้นมา
   useEffect(() => {
     if (!isOpen) {
       setShowHistory(false);
       setHistoryLogs([]);
     } else {
-      // ถ้าเปิด Dialog ขึ้นมาแล้ว และบังเอิญหน้าจอมันค้างอยู่ที่หน้าประวัติ ให้โหลดข้อมูลใหม่ทันที
       if (showHistory && detailItem?.id) {
         fetchDeviceHistory();
       }
     }
   }, [isOpen]);
 
+  // ฟังก์ชันแยกสีตาม Action ของ Log
+  const getActionColor = (action) => {
+    const act = action?.toUpperCase() || "";
+    if (act.includes("เพิ่ม") || act.includes("CREATE")) return "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400 border-emerald-200";
+    if (act.includes("ลบ") || act.includes("DELETE")) return "bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-400 border-rose-200";
+    return "bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400 border-amber-200";
+  };
+
+  // จัดฟอร์แมตฟิลด์ข้อมูลที่เปลี่ยนให้สวยงาม
+  const renderChangedFields = (fields) => {
+    if (!fields) return null;
+    let parsedFields = fields;
+    if (typeof fields === 'string') {
+      try {
+        if (fields.trim().startsWith('{') || fields.trim().startsWith('[')) {
+          parsedFields = JSON.parse(fields);
+        }
+      } catch (e) {
+        parsedFields = fields;
+      }
+    }
+
+    if (typeof parsedFields === 'object' && parsedFields !== null) {
+      return (
+        <div className="space-y-2 mt-2 w-full">
+          {Object.entries(parsedFields).map(([key, value]) => (
+            <div key={key} className="flex flex-col sm:flex-row sm:items-center gap-2 bg-background/50 p-2 rounded-lg border text-xs w-full">
+              <span className="font-semibold text-foreground/80 shrink-0 bg-muted px-2 py-0.5 rounded border sm:w-[25%] text-center font-mono truncate">
+                {key}
+              </span>
+              <div className="flex items-center gap-2 flex-wrap pl-1 sm:pl-0 sm:w-[75%]">
+                {value?.old !== undefined && (
+                  <>
+                    <span className="text-rose-600 dark:text-rose-400 line-through bg-rose-50 dark:bg-rose-950/20 px-1.5 py-0.5 rounded truncate max-w-[45%]">{String(value.old)}</span>
+                    <span className="text-muted-foreground font-mono">→</span>
+                  </>
+                )}
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 rounded truncate max-w-[45%]">
+                  {value?.new !== undefined ? String(value.new) : String(value)}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    const fieldLines = String(fields).split(/,|\n/).filter(Boolean);
+    return (
+      <div className="space-y-1 mt-2 w-full">
+        {fieldLines.map((line, idx) => (
+          <p key={idx} className="font-mono text-xs text-foreground/80 bg-background/50 p-2 rounded-lg flex items-start gap-2 border w-full">
+            <span className="text-amber-500 shrink-0">▪</span>
+            <span className="whitespace-pre-line breaking-words w-[95%]">{line.trim()}</span>
+          </p>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      {/* 📏 ปรับขนาดความกว้างเป็น max-w-2xl ให้เท่ากับฟอร์มหน้า Add และ Edit เป๊ะๆ */}
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto sm:rounded-2xl">
+        <DialogHeader className="border-b pb-4">
+          <DialogTitle className="flex items-center gap-2.5 text-xl font-bold tracking-tight">
             {showHistory && (
               <button
                 onClick={() => setShowHistory(false)}
-                className="p-1 hover:bg-muted rounded-full transition-colors"
+                className="p-1.5 hover:bg-muted rounded-full transition-colors border shadow-sm"
               >
-                <ArrowLeft size={18} />
+                <ArrowLeft size={16} />
               </button>
             )}
-            {showHistory ? "ประวัติการเปลี่ยนแปลงอุปกรณ์" : "รายละเอียดอุปกรณ์"}
+            {showHistory ? (
+              <div className="flex items-center gap-2 text-primary">
+                <History size={20} />
+                <span>ประวัติการเปลี่ยนแปลง</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-primary">
+                <Monitor size={20} />
+                <span>รายละเอียดอุปกรณ์</span>
+              </div>
+            )}
           </DialogTitle>
         </DialogHeader>
 
         {detailItem && (
-          <div className="space-y-6 mt-4">
-
+          <div className="mt-4 w-full">
             {!showHistory ? (
-              /* ================== หน้าแสดงรายละเอียดปกติ (Layout บล็อกเท่าหน้าฟอร์ม) ================== */
-              <>
-                {/* ส่วนแสดงรูปภาพ (ล้อกพิกัดเดียวกับ ImageUploader) */}
-                <div className="flex justify-center">
-                  {detailItem?.image_url ? (
-                    <img
-                      src={detailItem.image_url}
-                      alt={detailItem.name}
-                      className="w-[140px] h-[140px] object-cover rounded-xl border shadow-sm"
-                    />
-                  ) : (
-                    <div className="w-[140px] h-[140px] bg-muted rounded-xl flex items-center justify-center text-xs text-muted-foreground border border-dashed text-center p-2">
-                      ไม่มีรูปภาพ
-                    </div>
-                  )}
-                </div>
-
-                {/* Row 1: รหัสอุปกรณ์ & ชื่ออุปกรณ์ */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-muted-foreground">รหัสอุปกรณ์</Label>
-                    <div className="bg-muted/30 rounded-md border p-2 text-sm font-medium mt-1 min-h-[40px] flex items-center">
-                      {detailItem.asset_tag || "-"}
-                    </div>
-                    <div className="min-h-[20px] mt-1" /> {/* จองพื้นที่เท่าฟอร์มหลัก */}
+              /* ================== หน้ารายละเอียดแบบ % Layout ================== */
+              <div className="space-y-6 w-full">
+                {/* ส่วนหัวภาพและการ์ดข้อมูลเบื้องต้นปรับสัดส่วน % */}
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 bg-muted/20 p-4 rounded-2xl border w-full">
+                  <div className="w-[130px] sm:w-[20%] shrink-0 aspect-square">
+                    {detailItem?.image_url ? (
+                      <img
+                        src={detailItem.image_url}
+                        alt={detailItem.name}
+                        className="w-full h-full object-cover rounded-xl border bg-background shadow-md"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-background rounded-xl flex flex-col items-center justify-center text-xs text-muted-foreground border border-dashed text-center p-3">
+                        <Monitor size={28} className="mb-1 opacity-40 text-muted-foreground" />
+                        <span>ไม่มีรูปภาพ</span>
+                      </div>
+                    )}
                   </div>
-
-                  <div>
-                    <Label className="text-muted-foreground">ชื่ออุปกรณ์</Label>
-                    <div className="bg-muted/30 rounded-md border p-2 text-sm font-medium mt-1 min-h-[40px] flex items-center">
-                      {detailItem.name || "-"}
+                  <div className="space-y-2 text-center sm:text-left w-full sm:w-[80%]">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-semibold bg-primary/10 text-primary border border-primary/20">
+                      <Tag size={12} />
+                      {detailItem.asset_tag || "ไม่ระบุรหัส"}
                     </div>
-                    <div className="min-h-[20px] mt-1" />
-                  </div>
-                </div>
-
-                {/* Row 2: ประเภท & สถานะ */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-muted-foreground">ประเภท</Label>
-                    <div className="bg-muted/30 rounded-md border p-2 text-sm font-medium mt-1 min-h-[40px] flex items-center">
-                      {detailItem.category || "-"}
+                    <h3 className="text-xl font-bold text-foreground leading-tight break-words">{detailItem.name || "-"}</h3>
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                      <span className="text-xs px-2.5 py-1 bg-background border rounded-lg font-medium shadow-sm text-muted-foreground flex items-center gap-1">
+                        <Info size={12} /> {detailItem.category || "-"}
+                      </span>
+                      <span className="text-xs px-2.5 py-1 bg-background border rounded-lg font-semibold shadow-sm text-primary flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />
+                        {detailItem.status || "-"}
+                      </span>
                     </div>
-                    <div className="min-h-[20px] mt-1" />
-                  </div>
-
-                  <div>
-                    <Label className="text-muted-foreground">สถานะ</Label>
-                    <div className="bg-muted/30 rounded-md border p-2 text-sm font-medium mt-1 min-h-[40px] flex items-center">
-                      {detailItem.status || "-"}
-                    </div>
-                    <div className="min-h-[20px] mt-1" />
                   </div>
                 </div>
 
-                {/* Row 3 & 4: มอบหมาย, แผนก, วันที่ซื้อ, วันหมดประกัน */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-muted-foreground">มอบหมาย</Label>
-                    <div className="bg-muted/30 rounded-md border p-2 text-sm font-medium mt-1 min-h-[40px] flex items-center">
-                      {detailItem.assigned_to || "-"}
+                {/* ข้อมูลการจัดสรรแบบแบ่ง % ซ้าย-ขวา */}
+                <div className="bg-background rounded-xl border p-4 shadow-sm space-y-4 w-full">
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
+                    <User size={14} className="text-primary" />
+                    ข้อมูลผู้ถือครองและการจัดสรร
+                  </h4>
+                  <div className="grid sm:grid-cols-2 gap-4 w-full">
+                    <div className="w-full">
+                      <Label className="text-muted-foreground text-xs font-medium">ผู้ได้รับมอบหมาย</Label>
+                      <p className="mt-1 font-semibold text-sm bg-muted/40 px-3 py-2 rounded-lg border text-foreground/90 truncate">{detailItem.assigned_to || "—"}</p>
                     </div>
-                    <div className="min-h-[20px] mt-1" />
-                  </div>
-
-                  <div>
-                    <Label className="text-muted-foreground">แผนก</Label>
-                    <div className="bg-muted/30 rounded-md border p-2 text-sm font-medium mt-1 min-h-[40px] flex items-center">
-                      {detailItem.department || "-"}
+                    <div className="w-full">
+                      <Label className="text-muted-foreground text-xs font-medium">ฝ่าย / แผนก</Label>
+                      <p className="mt-1 font-semibold text-sm bg-muted/40 px-3 py-2 rounded-lg border text-foreground/90 truncate">{detailItem.department || "—"}</p>
                     </div>
-                    <div className="min-h-[20px] mt-1" />
-                  </div>
-
-                  <div>
-                    <Label className="text-muted-foreground">วันที่ซื้อ</Label>
-                    <div className="bg-muted/30 rounded-md border p-2 text-sm font-medium mt-1 min-h-[40px] flex items-center">
-                      {detailItem.purchase_date || "-"}
-                    </div>
-                    <div className="min-h-[20px] mt-1" />
-                  </div>
-
-                  <div>
-                    <Label className="text-muted-foreground">วันหมดประกัน</Label>
-                    <div className="bg-muted/30 rounded-md border p-2 text-sm font-medium mt-1 min-h-[40px] flex items-center">
-                      {detailItem.warranty_expire || "-"}
-                    </div>
-                    <div className="min-h-[20px] mt-1" />
                   </div>
                 </div>
-              </>
+
+                {/* ข้อมูลการรับประกันแบบแบ่ง % ซ้าย-ขวา */}
+                <div className="bg-background rounded-xl border p-4 shadow-sm space-y-4 w-full">
+                  <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
+                    <ShieldCheck size={14} className="text-primary" />
+                    ข้อมูลวันที่และการรับประกัน
+                  </h4>
+                  <div className="grid sm:grid-cols-2 gap-4 w-full">
+                    <div className="w-full">
+                      <Label className="text-muted-foreground text-xs font-medium">วันที่ซื้ออุปกรณ์</Label>
+                      <p className="mt-1 font-semibold text-sm bg-muted/40 px-3 py-2 rounded-lg border text-foreground/90 flex items-center gap-1.5">
+                        <Calendar size={14} className="opacity-60" />
+                        {detailItem.purchase_date || "—"}
+                      </p>
+                    </div>
+                    <div className="w-full">
+                      <Label className="text-muted-foreground text-xs font-medium">วันหมดอายุการรับประกัน</Label>
+                      <p className="mt-1 font-semibold text-sm bg-muted/40 px-3 py-2 rounded-lg border text-foreground/90 flex items-center gap-1.5">
+                        <Calendar size={14} className="opacity-60 text-primary" />
+                        {detailItem.warranty_expire || "—"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
-              /* ================== หน้าแสดงประวัติ (History Timeline View) ================== */
-              <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-2">
+              /* ================== หน้าประวัติแบบซ่อน Scrollbar ================== */
+              <div
+                className="max-h-[58vh] overflow-y-auto pr-1 scrollbar-none"
+                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} // ซ่อน Scrollbar สำหรับ Firefox & IE/Edge
+              >
+                {/* แทรกสไตล์ CSS ดิบสำหรับซ่อน Scrollbar ใน Chrome/Safari */}
+                <style>{`
+                  .scrollbar-none::-webkit-scrollbar {
+                    display: none;
+                  }
+                `}</style>
+
                 {loadingHistory ? (
-                  <div className="text-center py-12">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-                    <p className="text-sm text-muted-foreground">กำลังโหลดข้อมูลประวัติ...</p>
+                  <div className="text-center py-16">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-3"></div>
+                    <p className="text-sm text-muted-foreground">กำลังดึงข้อมูลประวัติย้อนหลัง...</p>
                   </div>
                 ) : historyLogs.length === 0 ? (
-                  <p className="text-center text-sm text-muted-foreground py-12">ไม่พบประวัติการแก้ไขหรือทำรายการของอุปกรณ์ชิ้นนี้</p>
+                  <div className="text-center py-16 text-muted-foreground bg-muted/10 border border-dashed rounded-xl">
+                    <History size={36} className="mx-auto mb-2 opacity-30 text-muted-foreground" />
+                    <p className="text-sm">ไม่พบประวัติการทำรายการหรือแก้ไขข้อมูลอุปกรณ์นี้</p>
+                  </div>
                 ) : (
-                  <div className="relative border-l border-muted-foreground/20 pl-4 ml-3 space-y-6 my-2">
-/* ================== หน้าแสดงประวัติ (History Timeline View) ================== */
-                    {/* 💡 ปรับตรงนี้: เพิ่ม style ซ่อน scrollbar เพื่อไม่ให้มันขึ้นซ้อนกันเป็น 2 แท่งครับ */}
-                    <div
-                      className="space-y-4 max-h-[58vh] overflow-y-auto pr-2"
-                      style={{
-                        scrollbarWidth: 'none',          /* สำหรับ Firefox */
-                        msOverflowStyle: 'none',         /* สำหรับ IE และ Edge */
-                      }}
-                    >
-                      {/* 🔥 เพิ่ม CSS ซ่อนสำหรับ Chrome, Safari, และ Opera */}
-                      <style>{`
-    div::-webkit-scrollbar {
-      display: none;
-    }
-  `}</style>
+                  <div className="relative border-l-2 border-muted pl-5 ml-4 space-y-6 my-3">
+                    {historyLogs.map((log) => (
+                      <div key={log.id} className="relative animate-in fade-in slide-in-from-bottom-3 duration-200">
+                        {/* จุดกลมนำสายตาบนเส้น Timeline */}
+                        <div className="absolute -left-[27px] top-1 bg-background border-2 border-primary rounded-full w-3 h-3 shadow-sm z-10" />
 
-                      {loadingHistory ? (
-                        <div className="text-center py-12">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-                          <p className="text-sm text-muted-foreground">กำลังโหลดข้อมูลประวัติ...</p>
-                        </div>
-                      ) : historyLogs.length === 0 ? (
-                        // ... โค้ดส่วนที่เหลือเหมือนเดิมเลยครับพี่ ..
-                        <p className="text-center text-sm text-muted-foreground py-12">ไม่พบประวัติการแก้ไขหรือทำรายการของอุปกรณ์ชิ้นนี้</p>
-                      ) : (
-                        <div className="relative border-l border-muted-foreground/20 pl-4 ml-3 space-y-6 my-2">
-                          {historyLogs.map((log) => {
-                            // 1. ฟังก์ชันแยกสีตาม Action ของ Log
-                            const getActionColor = (action) => {
-                              const act = action?.toUpperCase() || "";
-                              if (act.includes("เพิ่ม") || act.includes("CREATE")) return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
-                              if (act.includes("ลบ") || act.includes("DELETE")) return "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
-                              return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20"; // UPDATE / EDIT
-                            };
+                        <div className="bg-background p-4 rounded-xl border shadow-sm hover:shadow-md transition-all">
+                          {/* บาร์หัวข้อแสดงประเภทประวัติและเวลา */}
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-2.5">
+                            <span className={`text-[11px] font-bold tracking-wide px-2.5 py-0.5 rounded-full border shadow-sm uppercase ${getActionColor(log.action_type)}`}>
+                              {log.action_type || "EDITED"}
+                            </span>
+                            <span className="text-[11px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md flex items-center gap-1">
+                              <Clock size={12} />
+                              {log.created_at ? new Date(log.created_at).toLocaleString('th-TH', {
+                                year: 'numeric', month: 'short', day: 'numeric',
+                                hour: '2-digit', minute: '2-digit'
+                              }) : "-"}
+                            </span>
+                          </div>
 
-                            // 2. ฟังก์ชันช่วยจัดฟอร์แมตข้อมูลการเปลี่ยนแปลง (changed_fields) ให้แสดงผลละเอียดยิบ
-                            const renderChangedFields = (fields) => {
-                              if (!fields) return null;
+                          {/* เนื้อหารายละเอียดภายใน */}
+                          <div className="text-xs space-y-3 mt-3">
+                            <div className="leading-relaxed">
+                              <span className="text-muted-foreground font-medium">รายละเอียดงาน: </span>
+                              <span className="text-foreground font-semibold break-words">{log.details || "ไม่มีข้อมูลรายละเอียดเพิ่มเติม"}</span>
+                            </div>
 
-                              // กรณีที่ 1: ข้อมูลส่งมาเป็น Object/JSON อยู่แล้ว หรือเป็น String JSON ที่ต้อง Parse
-                              let parsedFields = fields;
-                              if (typeof fields === 'string') {
-                                try {
-                                  // เช็คว่าเป็นรูปแบบ JSON string หรือไม่
-                                  if (fields.trim().startsWith('{') || fields.trim().startsWith('[')) {
-                                    parsedFields = JSON.parse(fields);
-                                  }
-                                } catch (e) {
-                                  parsedFields = fields; // หาก parse ไม่ผ่าน ให้ใช้เป็น string ตามเดิม
-                                }
-                              }
-
-                              // ถ้ากลายเป็น Object (เช่น { "status": { "old": "ใช้งานได้", "new": "ส่งซ่อม" } })
-                              if (typeof parsedFields === 'object' && parsedFields !== null) {
-                                return (
-                                  <div className="space-y-1.5 mt-1">
-                                    {Object.entries(parsedFields).map(([key, value]) => (
-                                      <div key={key} className="flex flex-col sm:flex-row sm:items-center gap-1 bg-muted/40 p-1.5 rounded text-[11px] border border-muted/50">
-                                        <span className="font-semibold text-foreground/90 shrink-0 bg-muted px-1.5 py-0.5 rounded border min-w-[80px] text-center">
-                                          🔧 {key}
-                                        </span>
-                                        <div className="flex items-center gap-1 flex-wrap pl-1 sm:pl-0">
-                                          {value?.old !== undefined && (
-                                            <>
-                                              <span className="text-rose-600 dark:text-rose-400 line-through bg-rose-50 dark:bg-rose-950/30 px-1 rounded">{String(value.old)}</span>
-                                              <span className="text-muted-foreground">➡️</span>
-                                            </>
-                                          )}
-                                          <span className="text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-50 dark:bg-emerald-950/30 px-1 rounded">
-                                            {value?.new !== undefined ? String(value.new) : String(value)}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                );
-                              }
-
-                              // กรณีที่ 2: เป็นข้อความธรรมดา (String) ที่คั่นด้วยเครื่องหมายจุลภาค (,) หรือขึ้นบรรทัดใหม่ (\n)
-                              const fieldLines = String(fields).split(/,|\n/).filter(Boolean);
-                              return (
-                                <div className="space-y-1 mt-1">
-                                  {fieldLines.map((line, idx) => (
-                                    <p key={idx} className="font-mono text-[11px] text-foreground/90 leading-relaxed bg-muted/30 p-1.5 rounded flex items-start gap-1.5 border border-muted/30">
-                                      <span className="text-amber-500 shrink-0">🔹</span>
-                                      <span className="whitespace-pre-line">{line.trim()}</span>
-                                    </p>
-                                  ))}
-                                </div>
-                              );
-                            };
-
-                            return (
-                              <div key={log.id} className="relative animate-in fade-in slide-in-from-bottom-2 duration-200">
-                                {/* หมุดวงกลมของเส้น Timeline */}
-                                <div className="absolute -left-[23px] top-1.5 bg-background border-2 border-primary rounded-full w-3 h-3 z-10" />
-
-                                <div className="bg-muted/30 p-4 rounded-xl border shadow-sm hover:border-muted-foreground/20 transition-all">
-                                  {/* ส่วนหัวของการ์ด Log: ประเภทและเวลา */}
-                                  <div className="flex justify-between items-start sm:items-center flex-col sm:flex-row gap-2 border-b pb-2 border-muted/80">
-                                    <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${getActionColor(log.action_type)}`}>
-                                      {log.action_type || "อัปเดตข้อมูล"}
-                                    </span>
-                                    <span className="text-[11px] font-medium text-muted-foreground/90 bg-muted/60 px-2 py-0.5 rounded-md">
-                                      ⏱️ {log.created_at ? new Date(log.created_at).toLocaleString('th-TH', {
-                                        year: 'numeric', month: 'short', day: 'numeric',
-                                        hour: '2-digit', minute: '2-digit'
-                                      }) : "-"}
-                                    </span>
-                                  </div>
-
-                                  {/* ส่วนรายละเอียดตรงกลาง */}
-                                  <div className="text-xs space-y-2.5 mt-3">
-                                    <div className="leading-relaxed flex items-start gap-1.5">
-                                      <span className="text-muted-foreground shrink-0">📝 รายละเอียด:</span>
-                                      <span className="text-foreground font-medium">{log.details || "ไม่มีข้อมูลรายละเอียดเพิ่มเติม"}</span>
-                                    </div>
-
-                                    {/* แสดงจุดที่เกิดการเปลี่ยนแปลงแบบแบ่งสี/แบ่งแถวชัดเจน */}
-                                    {log.changed_fields && (
-                                      <div className="p-3 bg-background/80 rounded-lg border border-dashed border-muted-foreground/20">
-                                        <p className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 mb-1.5 flex items-center gap-1">
-                                          🔍 ข้อมูลที่มีการเปลี่ยนแปลง:
-                                        </p>
-                                        {renderChangedFields(log.changed_fields)}
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* ส่วนท้ายของการ์ด Log: แสดงข้อมูล User/Operator อย่างชัดเจน */}
-                                  <div className="text-[11px] pt-2 mt-3 border-t border-dashed border-muted/80 text-muted-foreground flex items-center justify-between">
-                                    <div className="flex items-center gap-1.5">
-                                      <span>ผู้ทำรายการ:</span>
-                                      <span className="font-semibold text-foreground bg-background border rounded px-2 py-0.5 shadow-sm flex items-center gap-1">
-                                        <span className="text-[10px]">👤</span> {log.operator_name || log.user_email || "System (ระบบ)"}
-                                      </span>
-                                    </div>
-
-                                    {/* ถ้ามีบทบาท (Role) ของ User ที่ดึงมาจาก Log */}
-                                    {log.user_role && (
-                                      <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/80 bg-muted px-1.5 py-0.5 rounded">
-                                        {log.user_role}
-                                      </span>
-                                    )}
-                                  </div>
-
-                                </div>
+                            {/* กล่องแสดงสิ่งที่ถูกแก้ไขข้อมูล */}
+                            {log.changed_fields && (
+                              <div className="p-3 bg-muted/30 rounded-xl border border-dashed border-muted-foreground/15 w-full">
+                                <p className="text-[11px] font-bold text-primary flex items-center gap-1">
+                                  <span>🔍 ข้อมูลการแก้ไขแอตทริบิวต์:</span>
+                                </p>
+                                {renderChangedFields(log.changed_fields)}
                               </div>
-                            );
-                          })}
+                            )}
+                          </div>
+
+                          {/* บอร์ดท้ายการ์ดประวัติ: แสดงชื่อผู้บันทึก */}
+                          <div className="text-[11px] pt-2 mt-3 border-t border-dashed text-muted-foreground flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                              <span>เจ้าหน้าที่ผู้จัดการ:</span>
+                              <span className="font-semibold text-foreground bg-muted/60 border rounded px-2 py-0.5 shadow-sm">
+                                👤 {log.operator_name || log.user_email || "System"}
+                              </span>
+                            </div>
+                            {log.user_role && (
+                              <span className="text-[9px] font-extrabold tracking-wider text-muted-foreground bg-muted px-1.5 py-0.5 rounded border uppercase">
+                                {log.user_role}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
             )}
 
-            {/* ส่วนท้ายฟอร์ม: จัดวางตำแหน่งปุ่มแบบเป๊ะๆ */}
-            <div className="flex justify-end items-center gap-3 mt-6 border-t pt-4">
+            {/* ส่วนท้ายฟอร์ม */}
+            <div className="flex justify-end items-center gap-2.5 mt-6 border-t pt-4">
               <Button
                 className="hover:bg-[#111827] hover:text-white"
                 variant="outline"
                 onClick={() => {
                   if (showHistory) {
-                    setShowHistory(false); // ย้อนกลับมาหน้ารายละเอียดหลัก
+                    setShowHistory(false);
                   } else {
-                    setIsOpen(false); // ปิดหน้าต่างหลักลงไป
+                    setIsOpen(false);
                   }
                 }}
               >
