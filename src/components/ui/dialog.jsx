@@ -33,7 +33,7 @@ const DialogContent = React.forwardRef(({ className, children, ...props }, ref) 
   onInteractOutside={(e) => e.preventDefault()}
   onEscapeKeyDown={(e) => e.preventDefault()}
   className={cn(
-    "fixed left-[50%] top-[50%] z-[9998] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
+    "fixed left-[50%] top-[50%] z-[9998] grid w-full max-w-3xl [&>button]:hidden translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
     className
   )}
   {...props}
