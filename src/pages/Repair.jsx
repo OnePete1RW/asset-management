@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import AddRepairModal from '@/components/Repair/AddRepairModal';
 
 const statusColors = {
   Pending: { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b' },
@@ -42,6 +43,7 @@ export default function Repair() {
   const [errors, setErrors] = useState({}); 
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false); // 🌟 ย้ายมาประกาศรวมกลุ่มด้านบนให้สะอาดตา
 
   const loadData = async () => {
     setLoading(true);
@@ -116,16 +118,18 @@ export default function Repair() {
 
   return (
     <div className="space-y-5">
+      {/* 🟢 ส่วนหัวและปุ่มสร้างใบซ่อม */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-foreground font-heading">Repair</h2>
-          <p className="text-muted-foreground text-sm mt-0.5">จัดการงานซ่อม IT ({repairs.length} รายการ)</p>
+          <h2 className="text-2xl font-bold flex items-center gap-2"><Wrench /> รายการซ่อมอุปกรณ์</h2>
         </div>
-        <Button onClick={openAdd} className="gap-2">
-          <Plus size={16} /> เพิ่มงานซ่อม
+        <Button onClick={() => setIsModalOpen(true)} className="gap-1.5">
+          <Plus size={16} />
+          <span>แจ้งซ่อมอุปกรณ์</span>
         </Button>
       </div>
 
+      {/* 🔍 แผงควบคุม ค้นหา และ คัดกรอง */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-48">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -143,6 +147,7 @@ export default function Repair() {
         </Select>
       </div>
 
+      {/* 📊 ตารางแสดงรายการงานซ่อม */}
       {loading ? (
         <div className="flex justify-center py-20">
           <div className="w-8 h-8 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
@@ -211,7 +216,14 @@ export default function Repair() {
         </div>
       )}
 
-      {/* 📐 Dialog เพิ่ม/แก้ไขข้อมูล: สไตล์ Compact ล็อกความสูง ปิดสกรอลล์บาร์ ไม่ดีดเนื้อหา */}
+      {/* 📦 Component ใบแจ้งซ่อมแยกส่วนที่เราเรียกใช้งาน */}
+      <AddRepairModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={loadData} 
+      />
+
+      {/* 📐 Dialog แก้ไขข้อมูลจากปุ่มรูปดินสอภายในตาราง */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl bg-background border shadow-xl sm:rounded-2xl p-5 flex flex-col overflow-hidden">
           <DialogHeader className="border-b pb-3 shrink-0">
@@ -221,14 +233,12 @@ export default function Repair() {
           <div className="flex-1 my-3 overflow-hidden w-full">
             <div className="grid grid-cols-2 gap-x-5 gap-y-0.5">
               
-              {/* แถวที่ 1: เลขที่ใบแจ้งซ่อม */}
               <div className="space-y-1">
                 <Label className="text-[11px] font-bold text-foreground/80">เลขที่ใบแจ้งซ่อม</Label>
                 <Input placeholder="เช่น REPAIR-2026-001" value={form.ticket_no || ''} onChange={e => setForm(f => ({ ...f, ticket_no: e.target.value }))} className="h-8 text-xs rounded-md" />
                 <div className="min-h-[16px]" /> 
               </div>
 
-              {/* 🛠️ แถวที่ 1 (ขวา): ดึงข้อมูลจากตาราง Device มาเป็น Dropdown */}
               <div className="space-y-1">
                 <Label className={`text-[11px] font-bold ${errors.device_id ? "text-red-500" : "text-foreground/80"}`}>เลือกอุปกรณ์จากระบบ *</Label>
                 <Select value={form.device_id || ""} onValueChange={handleDeviceChange}>
@@ -253,7 +263,6 @@ export default function Repair() {
                 </div>
               </div>
 
-              {/* แถวที่ 2: ผู้แจ้ง | ช่างซ่อม */}
               <div className="space-y-1">
                 <Label className="text-[11px] font-bold text-foreground/80">ผู้แจ้ง</Label>
                 <Input value={form.reported_by || ''} onChange={e => setForm(f => ({ ...f, reported_by: e.target.value }))} className="h-8 text-xs rounded-md" />
@@ -266,7 +275,6 @@ export default function Repair() {
                 <div className="min-h-[16px]" />
               </div>
 
-              {/* แถวที่ 3: ค่าซ่อม | ความเร่งด่วน */}
               <div className="space-y-1">
                 <Label className="text-[11px] font-bold text-foreground/80">ค่าซ่อม (บาท)</Label>
                 <Input type="number" value={form.repair_cost || ''} onChange={e => setForm(f => ({ ...f, repair_cost: e.target.value }))} className="h-8 text-xs rounded-md" />
@@ -282,7 +290,6 @@ export default function Repair() {
                 <div className="min-h-[16px]" />
               </div>
 
-              {/* แถวที่ 4: วันที่แจ้ง | วันที่ซ่อมเสร็จ */}
               <div className="space-y-1">
                 <Label className="text-[11px] font-bold text-foreground/80">วันที่แจ้ง</Label>
                 <Input type="date" value={form.reported_date || ''} onChange={e => setForm(f => ({ ...f, reported_date: e.target.value }))} className="h-8 text-xs rounded-md font-mono" />
@@ -295,7 +302,6 @@ export default function Repair() {
                 <div className="min-h-[16px]" />
               </div>
 
-              {/* แถวที่ 5: สถานะ */}
               <div className="space-y-1">
                 <Label className="text-[11px] font-bold text-foreground/80">สถานะ</Label>
                 <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
@@ -306,7 +312,6 @@ export default function Repair() {
               </div>
               <div className="min-h-[1px]" />
 
-              {/* แถวที่ 6: อาการเสีย */}
               <div className="col-span-2 space-y-1">
                 <Label className={`text-[11px] font-bold ${errors.issue_description ? "text-red-500" : "text-foreground/80"}`}>อาการเสีย *</Label>
                 <Input value={form.issue_description || ''} onChange={e => setForm(f => ({ ...f, issue_description: e.target.value }))} className={`h-8 text-xs rounded-md ${errors.issue_description ? "border-red-500 bg-red-50/20" : ""}`} />
@@ -320,7 +325,6 @@ export default function Repair() {
                 </div>
               </div>
 
-              {/* แถวที่ 7: หมายเหตุ */}
               <div className="col-span-2 space-y-1">
                 <Label className="text-[11px] font-bold text-foreground/80">หมายเหตุ</Label>
                 <Input value={form.notes || ''} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="h-8 text-xs rounded-md" />
@@ -339,7 +343,7 @@ export default function Repair() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog ยืนยันการลบ */}
+      {/* 🗑️ Dialog ยืนยันการลบ */}
       <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>ยืนยันการลบ</DialogTitle></DialogHeader>
