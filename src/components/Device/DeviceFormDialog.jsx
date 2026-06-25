@@ -110,15 +110,6 @@ export default function DeviceFormDialog({
       localErrors.department = "กรุณาเลือกแผนก";
     }
 
-    if (form.purchase_date && form.warranty_expire) {
-      const purchase = new Date(form.purchase_date);
-      const expire = new Date(form.warranty_expire);
-
-      if (purchase > expire) {
-        localErrors.warranty_expire = "วันหมดประกันไม่ถูกต้อง";
-      }
-    }
-
     if (Object.keys(localErrors).length > 0) {
       setErrors(localErrors);
       return;
@@ -147,8 +138,14 @@ export default function DeviceFormDialog({
         }
       }}
     >
-      {/* ล็อกหน้าตายตัว ห้ามมี scrollbar (overflow-hidden) */}
-      <DialogContent className="max-w-2xl bg-background border shadow-xl sm:rounded-2xl p-5 flex flex-col overflow-hidden">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto sm:rounded-2xl"
+        style={{
+          backgroundColor: '#ffffff',
+          opacity: 1,
+          backdropFilter: 'none',
+          boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)'
+        }}
+      >
 
         {/* ส่วนหัว */}
         <DialogHeader className="border-b pb-3 shrink-0">
@@ -160,11 +157,11 @@ export default function DeviceFormDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {/* ส่วนเนื้อหาฟอร์มจัดสไตล์ตามรูปภาพตัวอย่าง */}
+        {/* ส่วนเนื้อหาฟอร์ม */}
         <div className="flex-1 my-3 space-y-4 overflow-hidden w-full">
 
-          {/* ส่วนอัปโหลดรูปภาพ (ปรับขนาดและลด Padding ให้ตรงตามแบบ) */}
-          <div className="flex flex-col items-center justify-center bg-muted/5 py-3 px-4 rounded-xl border border-dashed w-full max-h-[120px]">
+          {/* ส่วนอัปโหลดรูปภาพ */}
+          <div className="flex flex-col items-center justify-center bg-muted/5 py-3 px-4 rounded-xl border border-dashed w-full max-h-[130px]">
             <div className="scale-90 transform origin-center">
               <ImageUploader
                 imageUrl={form.image_url}
@@ -173,7 +170,7 @@ export default function DeviceFormDialog({
             </div>
           </div>
 
-          {/* แผงกรอกข้อมูลหลัก (ยุบรวมกรอบเดียว ไร้การ์ดแยกซ้อน เพื่อความคลีน) */}
+          {/* แผงกรอกข้อมูลหลัก */}
           <div className="bg-background rounded-xl border p-4 shadow-sm w-full">
             <div className="grid grid-cols-2 gap-x-5 gap-y-1">
 
@@ -188,7 +185,6 @@ export default function DeviceFormDialog({
                   onBlur={() => setFocusField("")}
                   onChange={(e) => setForm(f => ({ ...f, asset_tag: e.target.value }))}
                 />
-                {/* 🔴 จองพื้นที่สำหรับแจ้งเตือนช่องว่างคงที่ (min-h-[16px]) */}
                 <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
                   {errors.asset_tag && (
                     <>
@@ -219,29 +215,6 @@ export default function DeviceFormDialog({
                 </div>
               </div>
 
-              {/* แถวที่ 2: สถานะการใช้งาน | ผู้ได้รับมอบหมาย */}
-              <div className="w-full">
-                <Label className={`text-[11px] font-bold ${errors.status ? "text-red-500" : "text-foreground/80"}`}>สถานะการใช้งาน</Label>
-                <div className="mt-1">
-                  <Select value={form.status || ""} onValueChange={(v) => { setForm(f => ({ ...f, status: v })); setErrors(prev => ({ ...prev, status: "" })); }}>
-                    <SelectTrigger className={`h-8 text-xs rounded-md transition-colors ${errors.status ? "border-red-500 bg-red-50/20 text-red-500 focus:ring-red-500" : ""}`}>
-                      <SelectValue placeholder={errors.status ? errors.status : "เลือกสถานะ"} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-lg">
-                      {statuses.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
-                  {errors.status && (
-                    <>
-                      <AlertCircle size={10} className="shrink-0" />
-                      <p className="text-[10px] font-semibold leading-none">{errors.status}</p>
-                    </>
-                  )}
-                </div>
-              </div>
-
               <div className="w-full">
                 <Label className={`text-[11px] font-bold ${errors.assigned_to ? "text-red-500" : "text-foreground/80"}`}>ผู้ได้รับมอบหมาย</Label>
                 <Input
@@ -261,29 +234,7 @@ export default function DeviceFormDialog({
                   )}
                 </div>
               </div>
-
-              {/* แถวที่ 3: ประเภทอุปกรณ์ | ฝ่าย / แผนก */}
-              <div className="w-full">
-                <Label className={`text-[11px] font-bold ${errors.category ? "text-red-500" : "text-foreground/80"}`}>ประเภทอุปกรณ์</Label>
-                <div className="mt-1">
-                  <Select value={form.category || ""} onValueChange={(v) => { setForm(f => ({ ...f, category: v })); setErrors(prev => ({ ...prev, category: "" })); }}>
-                    <SelectTrigger className={`h-8 text-xs rounded-md transition-colors ${errors.category ? "border-red-500 bg-red-50/20 text-red-500 focus:ring-red-500" : ""}`}>
-                      <SelectValue placeholder={errors.category ? errors.category : "เลือกประเภท"} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-lg">
-                      {categories.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
-                  {errors.category && (
-                    <>
-                      <AlertCircle size={10} className="shrink-0" />
-                      <p className="text-[10px] font-semibold leading-none">{errors.category}</p>
-                    </>
-                  )}
-                </div>
-              </div>
+              {/* แถวที่ 2: สถานะการใช้งาน (แก้ไขตัวเลือกเป็น: ใช้งานปกติ และ สำรอง) */}
 
               <div className="w-full">
                 <Label className={`text-[11px] font-bold ${errors.department ? "text-red-500" : "text-foreground/80"}`}>ฝ่าย / แผนก</Label>
@@ -306,6 +257,53 @@ export default function DeviceFormDialog({
                   )}
                 </div>
               </div>
+              <div className="w-full">
+                <Label className={`text-[11px] font-bold ${errors.category ? "text-red-500" : "text-foreground/80"}`}>ประเภทอุปกรณ์</Label>
+                <div className="mt-1">
+                  <Select value={form.category || ""} onValueChange={(v) => { setForm(f => ({ ...f, category: v })); setErrors(prev => ({ ...prev, category: "" })); }}>
+                    <SelectTrigger className={`h-8 text-xs rounded-md transition-colors ${errors.category ? "border-red-500 bg-red-50/20 text-red-500 focus:ring-red-500" : ""}`}>
+                      <SelectValue placeholder={errors.category ? errors.category : "เลือกประเภท"} />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg">
+                      {categories.map(c => <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.category && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.category}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="w-full">
+                <Label className={`text-[11px] font-bold ${errors.status ? "text-red-500" : "text-foreground/80"}`}>สถานะการใช้งาน</Label>
+                <div className="mt-1">
+                  <Select value={form.status || ""} onValueChange={(v) => { setForm(f => ({ ...f, status: v })); setErrors(prev => ({ ...prev, status: "" })); }}>
+                    <SelectTrigger className={`h-8 text-xs rounded-md transition-colors ${errors.status ? "border-red-500 bg-red-50/20 text-red-500 focus:ring-red-500" : ""}`}>
+                      <SelectValue placeholder={errors.status ? errors.status : "เลือกสถานะ"} />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-lg">
+                      {/* 🛠️ กรองเอาเฉพาะ 'ใช้งานปกติ' และ 'สำรอง' มาแสดงเป็นตัวเลือกในการเพิ่มอุปกรณ์ */}
+                      {statuses
+                        .filter(s => s === 'สำรอง' || s === 'ใช้งาน')
+                        .map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)
+                      }
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.status && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.status}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+              {/* แถวที่ 3: ประเภทอุปกรณ์ | ฝ่าย / แผนก */}
 
               {/* แถวที่ 4: วันที่ซื้ออุปกรณ์ | วันหมดประกัน */}
               <div className="w-full border-t border-dashed pt-2 mt-1">
@@ -341,7 +339,7 @@ export default function DeviceFormDialog({
           </div>
         </div>
 
-        {/* ส่วนปุ่มกด Actions ท้ายฟอร์ม (ล็อกแน่น ไม่เลื่อนหาย) */}
+        {/* ส่วนปุ่มกด Actions ท้ายฟอร์ม */}
         <div className="flex justify-end items-center gap-2 border-t pt-3 shrink-0">
           <Button
             className="hover:bg-[#111827] hover:text-white"

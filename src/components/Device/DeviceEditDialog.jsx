@@ -1,369 +1,210 @@
-// import React, { useState } from 'react';
-// import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-// import { Button } from '@/components/ui/button';
-// import { Input } from '@/components/ui/input';
-// import { Label } from '@/components/ui/label';
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-// import { supabase } from '@/lib/supabase';
-// import ImageUploader from './ImageUploader';
-// import ImageCropDialog from './ImageCropDialog';
+import React, { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { supabase } from '@/lib/supabase';
+import ImageCropDialog from './ImageCropDialog';
+import ImageUploader from './ImageUploader';
+import { Laptop, Lock, Wrench, RefreshCw, ArrowLeftRight, Unlock } from 'lucide-react';
+import GodexPrintButton from '@/components/Device/GodexPrintButton'
+export default function DeviceEditDialog({
+    isOpen,
+    setIsOpen,
+    form,
+    setForm,
+    errors,
+    setErrors,
+    focusField,
+    setFocusField,
+    saving,
+    handleSave,
+    categories,
+    statuses,
+    departments,
+    onRepairSubmit,
+    onTransferSubmit,
+    onBorrowSubmit,
+    onPrintBarcode
+}) {
+    const [imageSrc, setImageSrc] = useState(null);
+    const [crop, setCrop] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+    const [cropDialogOpen, setCropDialogOpen] = useState(false);
 
-// export default function DeviceEditDialog({
-//   isOpen,
-//   setIsOpen,
-//   form,
-//   setForm,
-//   errors,
-//   setErrors,
-//   focusField,
-//   setFocusField,
-//   saving,
-//   handleSave,
-//   setCloseConfirmOpen,
-//   categories,
-//   statuses,
-//   departments
-// }) {
-//   const [showAlert, setShowAlert] = useState(false);
+    // 🌟 States สำหรับควบคุมโมดอลย่อยด้านใน (Sub-dialogs)
+    const [subModal, setSubModal] = useState({ type: null, isOpen: false });
+    const [repairNote, setRepairNote] = useState("");
+    const [transferForm, setTransferForm] = useState({
+        from_user: form?.assigned_to || "",
+        to_user: "",
+        from_dept: form?.department || "",
+        to_dept: ""
+    });
 
-//   // สเตตัสสำหรับหน้าต่างตัดรูปภาพ
-//   const [imageSrc, setImageSrc] = useState(null);
-//   const [crop, setCrop] = useState({ x: 0, y: 0 });
-//   const [zoom, setZoom] = useState(1);
-//   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-//   const [cropDialogOpen, setCropDialogOpen] = useState(false);
+    // 🔹 ฟังก์ชันจัดการเมื่อเลือกไฟล์รูปภาพ (Local)
+    const handleImageChangeLocal = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
 
-//   // ฟังก์ชันเมื่อเลือกรูปหรือลากรูปมาวาง
-//   const handleImageChangeLocal = (e) => {
-//     const file = e.target.files?.[0];
-//     if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            setImageSrc(reader.result);
+            setCropDialogOpen(true);
+        };
+        reader.readAsDataURL(file);
+    };
 
-//     const reader = new FileReader();
-//     reader.onload = () => {
-//       setImageSrc(reader.result);
-//       setCropDialogOpen(true);
-//     };
-//     reader.readAsDataURL(file);
-//   };
+    // 🔹 ฟังก์ชันตัดรูปผ่าน Canvas และอัปโหลดขึ้น Supabase Storage
+    const saveCropLocal = async () => {
+        if (!croppedAreaPixels || !imageSrc) return;
 
-//   // ฟังก์ชันคำนวณการตัดรูปภาพพิกเซลจริง และส่งเข้า Supabase
-//   const saveCropLocal = async () => {
-//     if (!croppedAreaPixels || !imageSrc) return;
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = 300;
+        canvas.height = 300;
 
-//     const canvas = document.createElement("canvas");
-//     const ctx = canvas.getContext("2d");
-//     canvas.width = 300;
-//     canvas.height = 300;
+        const image = new Image();
+        image.src = imageSrc;
 
-//     const image = new Image();
-//     image.src = imageSrc;
+        image.onload = async () => {
+            ctx.drawImage(
+                image,
+                croppedAreaPixels.x,
+                croppedAreaPixels.y,
+                croppedAreaPixels.width,
+                croppedAreaPixels.height,
+                0,
+                0,
+                300,
+                300
+            );
 
-//     image.onload = async () => {
-//       ctx.drawImage(
-//         image,
-//         croppedAreaPixels.x,
-//         croppedAreaPixels.y,
-//         croppedAreaPixels.width,
-//         croppedAreaPixels.height,
-//         0,
-//         0,
-//         300,
-//         300
-//       );
+            canvas.toBlob(async (blob) => {
+                if (!blob) return;
+                const fileName = `${Date.now()}.png`;
+                const { error } = await supabase.storage
+                    .from("device-images")
+                    .upload(fileName, blob);
 
-//       canvas.toBlob(async (blob) => {
-//         const fileName = `${Date.now()}.png`;
-//         const { error } = await supabase.storage
-//           .from("device-images")
-//           .upload(fileName, blob);
+                if (error) {
+                    alert("อัปโหลดรูปภาพล้มเหลว: " + error.message);
+                    return;
+                }
 
-//         if (error) {
-//           alert("อัปโหลดรูปภาพล้มเหลว: " + error.message);
-//           return;
-//         }
+                const { data: { publicUrl } } = supabase.storage
+                    .from("device-images")
+                    .getPublicUrl(fileName);
 
-//         const { data: { publicUrl } } = supabase.storage
-//           .from("device-images")
-//           .getPublicUrl(fileName);
+                setForm(f => ({ ...f, image_url: publicUrl }));
+                setCropDialogOpen(false);
+            });
+        };
+    };
 
-//         setForm(f => ({ ...f, image_url: publicUrl }));
-//         setCropDialogOpen(false);
-//       });
-//     };
-//   };
+    // 1. ตรวจสอบการบันทึก (ถ้าแก้รหัสอุปกรณ์ ให้เข้าสถานะรออนุมัติ)
+    const validateAndSave = () => {
+        const localErrors = {};
+        if (!form?.name?.trim()) localErrors.name = "กรุณากรอกชื่ออุปกรณ์";
+        if (!form?.asset_tag?.trim()) localErrors.asset_tag = "กรุณากรอกรหัสอุปกรณ์";
 
-//   // 🛠️ ฟังก์ชันตรวจสอบข้อมูล "ครบทุกฟิลด์" และเช็คการเปลี่ยนแปลงก่อนส่งเซฟ
-//   const validateAndSave = () => {
-//     const localErrors = {};
+        if (Object.keys(localErrors).length > 0) {
+            setErrors(localErrors);
+            return;
+        }
 
-//     if (!form.asset_tag || form.asset_tag.toString().trim() === "") {
-//       localErrors.asset_tag = "กรุณากรอกรหัสอุปกรณ์";
-//     }
-//     if (!form.name || form.name.trim() === "") {
-//       localErrors.name = "กรุณากรอกชื่ออุปกรณ์";
-//     }
-//     if (!form.category || form.category.trim() === "") {
-//       localErrors.category = "กรุณาเลือกประเภทอุปกรณ์";
-//     }
+        handleSave({
+            isPendingApproval: true,
+        });
+    };
 
-//     if (form.purchase_date && form.warranty_expire) {
-//       const purchase = new Date(form.purchase_date);
-//       const expire = new Date(form.warranty_expire);
+    // 2. ฟังก์ชันจัดการเมื่อกดยืนยันการแจ้งซ่อม
+    const handleConfirmRepair = async () => {
+        if (!repairNote.trim()) {
+            alert("กรุณาระบุอาการเสียก่อนส่งอนุมัติ");
+            return;
+        }
 
-//       if (purchase > expire) {
-//         localErrors.warranty_expire = "วันหมดประกันต้องอยู่หลังจากวันที่ซื้อ";
-//       }
-//     }
+        try {
+            // 1. อัปเดตข้อมูลในตารางอุปกรณ์ (devices)
+            // เปลี่ยน status เป็น 'รออนุมัติซ่อม' และบันทึก repairNote ลงในตารางหรือตาราง log
+            await supabase.from('devices').update({
+                status: 'รออนุมัติซ่อม',
+                repair_note: repairNote,
+                last_updated: new Date().toISOString()
+            }).eq('id', form.id);
 
-//     // หากพบข้อผิดพลาด ให้หยุดทำงานและแสดงผลเตือนสีแดงทันที
-//     if (Object.keys(localErrors).length > 0) {
-//       setErrors(localErrors);
-//       return;
-//     }
+            // 2. ส่งข้อมูลเข้าตารางการอนุมัติ (approvals) เพื่อให้หัวหน้ากด Approve ในหน้าถัดไป
+            await supabase.from('approvals').insert({
+                device_id: form.id,
+                request_type: 'repair',
+                note: repairNote,
+                status: 'pending',
+                created_at: new Date().toISOString()
+            });
 
-//     // ตรวจสอบว่าไม่มีอะไรเปลี่ยนแปลงเลยหรือไม่ (ข้ามฟิลด์ที่โดนล็อคไป)
-//     const isUnchanged =
-//       (form.image_url || "") === (form.original_image_url || "") &&
-//       (form.asset_tag || "") === (form.original_asset_tag || "") &&
-//       (form.name || "") === (form.original_name || "") &&
-//       (form.category || "") === (form.original_category || "") &&
-//       (form.purchase_date || "") === (form.original_purchase_date || "") &&
-//       (form.warranty_expire || "") === (form.original_warranty_expire || "");
+            // 3. ปิด Modal ทั้งหมดหลังจากบันทึกสำเร็จ
+            setSubModal({ type: null, isOpen: false }); // ปิดตัวแจ้งซ่อม
+            onClose(); // <--- เรียกฟังก์ชันปิดหน้า Edit หลัก (สำคัญมาก)
 
-//     if (isUnchanged) {
-//       setShowAlert(true); // เด้งกล่องเตือนว่าไม่ได้แก้อะไรเลย
-//       return;
-//     }
+            alert("ส่งคำขอแจ้งซ่อมไปยังระบบอนุมัติเรียบร้อยแล้ว");
+        } catch (error) {
+            console.error("Error updating status:", error);
+            alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+        }
+    };
+    const handleCancel = () => {
+        setErrors({});
+        setIsOpen(false);
+    };
 
-//     handleSave();
-//   };
+    return (
+        <Dialog open={isOpen} onOpenChange={handleCancel}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto sm:rounded-2xl"
+                style={{
+                    backgroundColor: '#ffffff',
+                    opacity: 1,
+                    backdropFilter: 'none',
+                    boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)'
+                }}
+            >
 
-//   // 🧹 ฟังก์ชันจัดการเมื่อกดยกเลิก
-//   const handleCancel = () => {
-//     setErrors({});
-//     const hasData = Object.values(form).some(value => value && value.toString().trim() !== "");
-//     if (hasData) {
-//       setCloseConfirmOpen(true);
-//     } else {
-//       setIsOpen(false);
-//     }
-//   };
+                {/* ส่วนหัว Dialog */}
+                <DialogHeader className="border-b pb-3 shrink-0">
+                    <DialogTitle className="flex items-center justify-between gap-2 text-base font-bold tracking-tight text-foreground">
+                        <div className="flex items-center gap-2">
+                            <div className="p-1 bg-amber-500/10 text-amber-500 rounded-lg border shadow-sm">
+                                <Laptop size={15} />
+                            </div>
+                            <span>แก้ไขรายละเอียดอุปกรณ์</span>
+                        </div>
 
-//   return (
-//     <Dialog
-//       open={isOpen}
-//       onOpenChange={(open) => {
-//         if (!open) {
-//           setErrors({});
-//           setCloseConfirmOpen(true);
-//         }
-//       }}
-//     >
-//       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-//         <DialogHeader>
-//           <DialogTitle>แก้ไขอุปกรณ์</DialogTitle>
-//         </DialogHeader>
+                    </DialogTitle>
+                </DialogHeader>
 
-//         <div className="space-y-6 mt-4">
-//           <div>
-//             <ImageUploader
-//               imageUrl={form.image_url}
-//               onImageChange={handleImageChangeLocal}
-//             />
-//           </div>
 
-//           {/* Row 1 */}
-//           <div className="grid md:grid-cols-2 gap-4">
-//             <div>
-//               <Label className={errors.asset_tag ? "text-red-500" : ""}>รหัสอุปกรณ์</Label>
-//               <Input
-//                 value={form.asset_tag || ""}
-//                 placeholder={focusField === "asset_tag" ? "" : errors.asset_tag ? errors.asset_tag : "เช่น ASSET-001"}
-//                 className={errors.asset_tag ? "border-red-500 placeholder:text-red-500" : ""}
-//                 onFocus={() => {
-//                   setFocusField("asset_tag");
-//                   setErrors(prev => ({ ...prev, asset_tag: "" }));
-//                 }}
-//                 onBlur={() => setFocusField("")}
-//                 onChange={(e) => setForm(f => ({ ...f, asset_tag: e.target.value }))}
-//               />
-//               <div className="min-h-[20px] mt-1">
-//                 {errors.asset_tag && <p className="text-[11px] text-red-500">{errors.asset_tag}</p>}
-//               </div>
-//             </div>
 
-//             <div>
-//               <Label className={errors.name ? "text-red-500" : ""}>ชื่ออุปกรณ์</Label>
-//               <Input
-//                 value={form.name || ""}
-//                 placeholder={focusField === "name" ? "" : errors.name ? errors.name : "เช่น Laptop Dell XPS 13"}
-//                 className={errors.name ? "border-red-500 placeholder:text-red-500" : ""}
-//                 onFocus={() => {
-//                   setFocusField("name");
-//                   setErrors(prev => ({ ...prev, name: "" }));
-//                 }}
-//                 onBlur={() => setFocusField("")}
-//                 onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
-//               />
-//               <div className="min-h-[20px] mt-1">
-//                 {errors.name && <p className="text-[11px] text-red-500">{errors.name}</p>}
-//               </div>
-//             </div>
-//           </div>
-
-//           {/* Row 2 */}
-//           <div className="grid md:grid-cols-2 gap-4">
-//             <div>
-//               <Label className={errors.category ? "text-red-500" : ""}>ประเภท</Label>
-//               <Select
-//                 value={form.category || ""}
-//                 onValueChange={(v) => {
-//                   setForm(f => ({ ...f, category: v }));
-//                   setErrors(prev => ({ ...prev, category: "" }));
-//                 }}
-//               >
-//                 <SelectTrigger className={errors.category ? "border-red-500 text-red-500 focus:ring-red-500" : ""}>
-//                   <SelectValue placeholder={errors.category ? errors.category : "ประเภท"} />
-//                 </SelectTrigger>
-//                 <SelectContent>
-//                   {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-//                 </SelectContent>
-//               </Select>
-//               <div className="min-h-[20px] mt-1">
-//                 {errors.category && <p className="text-[11px] text-red-500">{errors.category}</p>}
-//               </div>
-//             </div>
-
-//             {/* 🔒 ล็อคเมนู: สถานะ */}
-//             <div>
-//               <Label className="text-muted-foreground">สถานะ (เปลี่ยนผ่านระบบคำขอ)</Label>
-//               <Select value={form.status || ""} disabled>
-//                 <SelectTrigger className="bg-muted/60 text-muted-foreground cursor-not-allowed">
-//                   <SelectValue placeholder="สถานะ" />
-//                 </SelectTrigger>
-//                 <SelectContent>
-//                   {statuses.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-//                 </SelectContent>
-//               </Select>
-//               <div className="min-h-[20px] mt-1" />
-//             </div>
-//           </div>
-
-//           {/* Row 3 & 4 */}
-//           <div className="grid md:grid-cols-2 gap-4">
-//             {/* 🔒 ล็อคเมนู: มอบหมาย */}
-//             <div>
-//               <Label className="text-muted-foreground">มอบหมาย (เปลี่ยนผ่านระบบคำขอ)</Label>
-//               <Input
-//                 value={form.assigned_to || ""}
-//                 disabled
-//                 className="bg-muted/60 text-muted-foreground cursor-not-allowed"
-//                 placeholder="ไม่มีผู้รับผิดชอบ"
-//               />
-//               <div className="min-h-[20px] mt-1" />
-//             </div>
-
-//             {/* 🔒 ล็อคเมนู: แผนก */}
-//             <div>
-//               <Label className="text-muted-foreground">แผนก (เปลี่ยนผ่านระบบคำขอ)</Label>
-//               <Select value={form.department || ""} disabled>
-//                 <SelectTrigger className="bg-muted/60 text-muted-foreground cursor-not-allowed">
-//                   <SelectValue placeholder="แผนก" />
-//                 </SelectTrigger>
-//                 <SelectContent>
-//                   {departments.map(dep => <SelectItem key={dep} value={dep}>{dep}</SelectItem>)}
-//                 </SelectContent>
-//               </Select>
-//               <div className="min-h-[20px] mt-1" />
-//             </div>
-
-//             <div>
-//               <Label>วันที่ซื้อ</Label>
-//               <Input
-//                 type="date"
-//                 value={form.purchase_date || ""}
-//                 onChange={(e) => {
-//                   setForm(f => ({ ...f, purchase_date: e.target.value }));
-//                   setErrors(prev => ({ ...prev, warranty_expire: "" }));
-//                 }}
-//               />
-//               <div className="min-h-[20px] mt-1" />
-//             </div>
-
-//             <div>
-//               <Label className={errors.warranty_expire ? "text-red-500" : ""}>วันหมดประกัน</Label>
-//               <Input
-//                 type="date"
-//                 value={form.warranty_expire || ""}
-//                 className={errors.warranty_expire ? "border-red-500 text-red-500 focus-visible:ring-red-500" : ""}
-//                 onChange={(e) => {
-//                   setForm(f => ({ ...f, warranty_expire: e.target.value }));
-//                   setErrors(prev => ({ ...prev, warranty_expire: "" }));
-//                 }}
-//               />
-//               <div className="min-h-[20px] mt-1">
-//                 {errors.warranty_expire && <p className="text-[11px] text-red-500">{errors.warranty_expire}</p>}
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* ส่วนท้ายฟอร์ม: เคลียร์เหลือเพียงกลุ่มปุ่มบันทึกและยกเลิกหลักอย่างถูกต้อง */}
-//         <div className="flex justify-end items-center gap-3 mt-6 border-t pt-4">
-//           <Button
-//             className="hover:bg-[#111827] hover:text-white"
-//             variant="outline"
-//             onClick={handleCancel}
-//           >
-//             ยกเลิก
-//           </Button>
-
-//           <Button
-//             className="hover:bg-[#111827] hover:text-white"
-//             variant="outline"
-//             disabled={saving}
-//             onClick={validateAndSave}
-//           >
-//             {saving ? "กำลังบันทึก..." : "บันทึก"}
-//           </Button>
-//         </div>
-
-//         {/* หน้าต่างย่อยสำหรับแสดงตัวเลื่อนตัดรูป */}
-//         <ImageCropDialog
-//           isOpen={cropDialogOpen}
-//           setIsOpen={setCropDialogOpen}
-//           imageSrc={imageSrc}
-//           crop={crop}
-//           setCrop={setCrop}
-//           zoom={zoom}
-//           setZoom={setZoom}
-//           onCropComplete={(seededArea, pixels) => setCroppedAreaPixels(pixels)}
-//           onSave={saveCropLocal}
-//         />
-
-//         {/* บล็อกแจ้งเตือนเมื่อไม่มีการแก้ไขข้อมูล */}
-//         {showAlert && (
-//           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-//             <div className="bg-background border rounded-xl shadow-lg max-w-sm w-full p-6 text-center space-y-4 animate-in zoom-in-95 duration-200">
-//               <div className="space-y-2">
-//                 <h3 className="text-base font-semibold text-foreground">ไม่พบการเปลี่ยนแปลง</h3>
-//                 <p className="text-sm text-muted-foreground">
-//                   คุณยังไม่ได้แก้ไขข้อมูลใด ๆ กรุณาตรวจสอบและลองใหม่อีกครั้ง
-//                 </p>
-//               </div>
-//               <div className="pt-2">
-//                 <Button
-//                   className="w-full border-1px hover:bg-[#111827] hover:text-white"
-//                   variant="outline"
-//                   onClick={() => setShowAlert(false)}
-//                 >
-//                   รับทราบ
-//                 </Button>
-//               </div>
-//             </div>
-//           </div>
-//         )}
-//       </DialogContent>
-//     </Dialog>
-//   );
-// }
+                {/* ส่วนปุ่มกดบันทึก */}
+                <div className="flex justify-end items-center gap-2 border-t pt-3 shrink-0">
+                    <Button className="hover:bg-[#111827] hover:text-white" variant="outline" onClick={handleCancel}>ยกเลิก</Button>
+                    <Button className="hover:bg-[#111827] hover:text-white" variant="outline" onClick={validateAndSave} disabled={saving}>
+                        {saving ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
+                    </Button>
+                </div>
+            </DialogContent>
+            <ImageCropDialog
+                isOpen={cropDialogOpen}
+                setIsOpen={setCropDialogOpen}
+                imageSrc={imageSrc}
+                crop={crop}
+                setCrop={setCrop}
+                zoom={zoom}
+                setZoom={setZoom}
+                onCropComplete={(seededArea, pixels) => setCroppedAreaPixels(pixels)}
+                onSave={saveCropLocal}
+            />        </Dialog>
+    );
+}

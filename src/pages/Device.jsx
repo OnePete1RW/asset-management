@@ -9,49 +9,33 @@ import CloseConfirmDialog from '@/components/Device/CloseConfirmDialog';
 import DeviceDetailDialog from '@/components/Device/DeviceDetailDialog';
 import DeleteConfirmDialog from '@/components/Device/DeleteConfirmDialog';
 import { Plus, Search, Filter } from "lucide-react";
+import DeviceEditDialog from '@/components/Device/DeviceEditDialog';
 
-// 🟢 1. ชุดสีพาสเทลสำหรับสถานะต่างๆ บนตารางหลัก
+// 1. ชุดสีพาสเทลสำหรับสถานะต่างๆ บนตารางหลัก
 const statusColors = {
-  'ใช้งาน': { 
-    bg: '#E0F2FE',    // สีฟ้าพาสเทล
-    color: '#000000' 
-  },
-  'สำรอง': { 
-    bg: '#DCFCE7',    // สีเขียวมินต์อ่อน
-    color: '#000000' 
-  },
-  'กำลังซ่อม': { 
-    bg: '#FEF3C7',    // สีเหลืองอำพัน
-    color: '#000000' 
-  },
-  'รออนุมัติส่งซ่อม': { 
-    bg: '#FFE4E6',    // สีแดงกุหลาบอ่อนพาสเทล (Rose)
-    color: '#9F1239' 
-  },
-  'ยืม': { 
-    bg: '#F3E8FF',    // สีม่วงลาเวนเดอร์
-    color: '#000000' 
-  },
-  'เสีย': { 
-    bg: '#F1F5F9',    // สีเทาอ่อน
-    color: '#000000' 
-  },
+  'ใช้งาน': { bg: '#E0F2FE', color: '#000000' },
+  'สำรอง': { bg: '#DCFCE7', color: '#000000' },
+  'กำลังซ่อม': { bg: '#FEF3C7', color: '#000000' },
+  'รออนุมัติส่งซ่อม': { bg: '#FFE4E6', color: '#9F1239' },
+  'ยืม': { bg: '#F3E8FF', color: '#000000' },
+  'เสีย': { bg: '#F1F5F9', color: '#000000' },
+  'รออนุมัติลบ': { bg: '#FFE4E6', color: '#9F1239' }
 };
 
 const categories = ['Laptop', 'Desktop', 'Monitor', 'Printer', 'Network', 'Server', 'Mobile', 'Tablet', 'Other'];
 const statuses = ['สำรอง', 'ใช้งาน', 'รออนุมัติส่งซ่อม', 'กำลังซ่อม', 'ยืม', 'เสีย'];
 const departments = [
-  "Management", "Human Resources", "Admin", "Accounting", "Finance", 
-  "Information Technology", "Sales", "Modern & Online Trade", 
-  "International Business", "Export", "Procurement", "Purchasing", 
-  "Delivery", "Shipping", "Import-Export Logistics", "Warehouse ", 
-  "Production", "Research & Development", "Quality Control ", 
+  "Management", "Human Resources", "Admin", "Accounting", "Finance",
+  "Information Technology", "Sales", "Modern & Online Trade",
+  "International Business", "Export", "Procurement", "Purchasing",
+  "Delivery", "Shipping", "Import-Export Logistics", "Warehouse ",
+  "Production", "Research & Development", "Quality Control ",
   "Registration & Document Control", "Graphic Design",
 ];
 
 const emptyForm = {
-  asset_tag: '', name: '', category: '', brand: '', model: '', 
-  serial_number: '', status: '', assigned_to: '', department: '', 
+  asset_tag: '', name: '', category: '', brand: '', model: '',
+  serial_number: '', status: '', assigned_to: '', department: '',
   purchase_date: '', purchase_price: '', warranty_expire: '', notes: '', image_url: '',
 };
 
@@ -62,7 +46,7 @@ export default function Device() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
-  const [editItem, setEditItem] = useState(null);
+  const [editItem, setEditItem] = useState(null); // ใช้เช็กว่ากำลังแก้ไขเครื่องไหน (null = ปิด Dialog แก้ไข)
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
@@ -77,7 +61,7 @@ export default function Device() {
     setDevices(data || []);
     setLoading(false);
   };
-  
+
   useEffect(() => { load(); }, []);
 
   const filtered = devices.filter((d) => {
@@ -95,10 +79,10 @@ export default function Device() {
     return matchSearch && matchStatus && matchDepartment;
   });
 
-  const openAdd = () => { 
-    setEditItem(null); 
-    setForm(emptyForm); 
-    setDialogOpen(true); 
+  const openAdd = () => {
+    setEditItem(null);
+    setForm(emptyForm);
+    setDialogOpen(true);
   };
 
   const openEdit = (item) => {
@@ -116,7 +100,6 @@ export default function Device() {
       original_purchase_date: item.purchase_date || "",
       original_warranty_expire: item.warranty_expire || "",
     });
-    setDialogOpen(true);
   };
 
   const handleSave = async () => {
@@ -164,14 +147,58 @@ export default function Device() {
 
     await load();
     setDialogOpen(false);
+    setEditItem(null); // ปิดหน้าต่าง Edit มื่อบันทึกเสร็จ
     setSaving(false);
   };
 
   const handleDelete = async (id) => {
-    await supabase.from('devices').delete().eq('id', id);
-    setDeleteId(null);
-    await load();
+    if (!id) return;
+
+    const targetDevice = devices.find(d => d.id === id);
+    if (!targetDevice) return;
+
+    const { error: approvalError } = await supabase
+      .from('approvals')
+      .insert([
+        {
+          device_id: targetDevice.id,
+          device_name: targetDevice.name,
+          request_type: 'Delete',
+          status: 'Pending',
+          requested_by: targetDevice.assigned_to || 'ไม่ระบุผู้ส่ง',
+          description: `ขออนุมัติลบอุปกรณ์: ${targetDevice.asset_tag || '—'}`,
+          priority: 'Medium'
+        }
+      ]);
+
+    if (approvalError) {
+      console.error("Error creating approval request:", approvalError.message);
+      alert("ไม่สามารถสร้างคำขออนุมัติได้: " + approvalError.message);
+      return;
+    }
+
+    const { error: deviceError } = await supabase
+      .from('devices')
+      .update({ status: 'รออนุมัติลบ' })
+      .eq('id', id);
+
+    if (!deviceError) {
+      setDevices(prevDevices =>
+        prevDevices.map(device =>
+          device.id === id ? { ...device, status: 'รออนุมัติลบ' } : device
+        )
+      );
+      setDeleteId(null);
+    } else {
+      console.error("Error updating device status:", deviceError.message);
+      alert("ไม่สามารถอัปเดตสถานะอุปกรณ์ได้: " + deviceError.message);
+    }
   };
+
+  // 💡 ฟังก์ชันจำลองเมื่อกดปุ่มเมนูด่วนในกล่องจัดสินทรัพย์
+  const handleRepair = () => alert("ส่งคำขอแจ้งซ่อมสำเร็จ (จำลองฟังก์ชัน)");
+  const handleTransfer = () => alert("เปิดเมนูเคลื่อนย้ายแผนกสำเร็จ (จำลองฟังก์ชัน)");
+  const handleBorrow = () => alert("เปิดเมนูยืม/คืนอุปกรณ์สำเร็จ (จำลองฟังก์ชัน)");
 
   return (
     <div className="space-y-5">
@@ -188,7 +215,7 @@ export default function Device() {
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-48">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="ค้นหาชื่อ, asset tag, ยี่ห้อ..." className="pl-9 bg-card" value={search} onChange={e => setSearch(e.target.value)} />
+          <Input placeholder="ค้นหาชื่อ, asset tag, ยี่ห้อ..." className="pl-9 h-10 w-full" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
         {/* Filter แผนก */}
@@ -218,17 +245,37 @@ export default function Device() {
       </div>
 
       <div>
+        {/* 🛠️ แก้ไขพรอพตรงนี้ จาก openEdit เป็น setEditItem เพื่อแมปคำสั่งจากตารางให้ตรงกัน */}
         <DeviceTable
           loading={loading}
           filtered={filtered}
           statusColors={statusColors}
           setDetailItem={setDetailItem}
-          openEdit={openEdit}
+          setEditItem={openEdit}
           setDeleteId={setDeleteId}
         />
       </div>
 
-      {/* 🟢 แก้ไขตรงนี้: เรียกใช้ฟอร์มกรอกข้อมูลหลักโดยตรงโดยไม่ต้องเช็คเงื่อนไข DeviceEditDialog แล้ว */}
+      {/* 🛠️ ปรับเปลี่ยนการแมปพรอพภายในจุดนี้ให้เชื่อมโยงสเตทได้ถูกต้องแม่นยำ */}
+      <DeviceEditDialog
+        isOpen={editItem !== null}
+        setIsOpen={(open) => !open && setEditItem(null)}
+        form={form} 
+        setForm={setForm}
+        errors={errors}
+        setErrors={setErrors}
+        focusField={focusField}
+        setFocusField={setFocusField}
+        saving={saving}
+        handleSave={handleSave}
+        categories={categories}
+        statuses={statuses}
+        departments={departments}
+        onRepairClick={handleRepair}
+        onTransferClick={handleTransfer}
+        onBorrowClick={handleBorrow}
+      />
+
       <DeviceFormDialog
         isOpen={dialogOpen}
         setIsOpen={setDialogOpen}
@@ -246,7 +293,6 @@ export default function Device() {
         departments={departments}
       />
 
-      {/* หน้าต่างแจ้งเตือนอื่น ๆ */}
       <CloseConfirmDialog
         isOpen={closeConfirmOpen}
         setIsOpen={setCloseConfirmOpen}

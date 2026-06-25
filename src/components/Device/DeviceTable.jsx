@@ -1,5 +1,6 @@
 import React from 'react';
-import { Monitor, Eye, Trash2, CalendarDays, AlertTriangle, CheckCircle2 } from 'lucide-react';
+// 📝 เพิ่มไอคอน Pencil เข้ามาใช้งาน
+import { Monitor, Eye, Pencil, Trash2, CalendarDays, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function DeviceTable({
@@ -7,7 +8,8 @@ export default function DeviceTable({
   filtered,
   statusColors,
   setDetailItem,
-  setDeleteId
+  setEditItem, // ➕ เพิ่มฟังก์ชันสำหรับรับค่าเพื่อแก้ไขข้อมูลเครื่อง
+  setDeleteId 
 }) {
   // สถานะกำลังโหลด
   if (loading) {
@@ -47,19 +49,17 @@ export default function DeviceTable({
           </thead>
           <tbody className="divide-y divide-border">
             {filtered.map((d) => {
-              const sc = statusColors[d.status] || statusColors.เสีย;
+              const sc = statusColors[d.status] || { bg: 'rgba(107,114,128,0.12)', color: '#6b7280' };
 
-              // 🎨 ฟังก์ชันเลือกสีป้ายประกันให้เนียนตา
               const renderWarrantyStatus = (expireDateString) => {
                 if (!expireDateString) return <span className="text-muted-foreground/40 font-mono text-xs">—</span>;
 
                 const expireDate = new Date(expireDateString);
                 const today = new Date();
-                
+
                 today.setHours(0, 0, 0, 0);
                 expireDate.setHours(0, 0, 0, 0);
 
-                // คำนวณส่วนต่างของวัน
                 const diffTime = expireDate.getTime() - today.getTime();
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -69,30 +69,27 @@ export default function DeviceTable({
                   year: 'numeric'
                 });
 
-                // 1. เคสหมดประกันแล้ว (สีแดงพาสเทลหรู ๆ เด้งเตือน)
                 if (diffDays < 0) {
                   return (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-200/50 shadow-sm animate-pulse">
-                      <AlertTriangle size={12} />
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-300 shadow-sm animate-pulse">
+                      <AlertTriangle size={12} className="text-red-600" />
                       หมดประกัน ({formattedDate})
                     </span>
                   );
                 }
 
-                // 2. เคสใกล้หมดประกัน ภายใน 30 วัน (สีส้ม/เหลืองพาสเทล ให้เตรียมตัว)
                 if (diffDays <= 30) {
                   return (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200/50 shadow-sm">
-                      <CalendarDays size={12} />
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-300 shadow-sm">
+                      <CalendarDays size={12} className="text-yellow-600" />
                       ใกล้หมด ({formattedDate})
                     </span>
                   );
                 }
 
-                // 3. เคสประกันเหลือเฟือ (สีเขียวมินต์ นุ่มนวล สบายตา)
                 return (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-950/20 dark:text-emerald-400 border border-emerald-100/30">
-                    <CheckCircle2 size={12} className="text-emerald-500" />
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-300">
+                    <CheckCircle2 size={12} className="text-emerald-600" />
                     {formattedDate}
                   </span>
                 );
@@ -107,7 +104,7 @@ export default function DeviceTable({
                   <td className="px-4 py-3 text-muted-foreground">{d.assigned_to || '—'}</td>
                   <td className="px-4 py-3">
                     <span
-                      className="inline-flex items-center justify-center rounded-full text-xs font-medium w-24 h-7 shadow-sm"
+                      className="inline-flex items-center justify-center rounded-full text-xs font-medium w-24 h-7 shadow-sm text-center"
                       style={{ background: sc.bg, color: sc.color }}
                     >
                       {d.status}
@@ -118,24 +115,44 @@ export default function DeviceTable({
                   </td>
                   <td className="px-2 py-3">
                     <div className="flex items-center gap-1 justify-end">
+                      {/* 1. ปุ่ม Detail (ดูรายละเอียด) */}
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
-                        onClick={() => setDetailItem(d)}
+                        onClick={(e) => {
+                          e.stopPropagation(); 
+                          setDetailItem(d);
+                        }}
                       >
                         <Eye size={14} />
                       </Button>
-                      
-                      {/* 🔴 นำปุ่มดินสอ (Edit) ออกเรียบร้อยแล้ว */}
 
+                      {/* 2. ปุ่ม Edit (แก้ไขข้อมูลเครื่อง) ➕ เพิ่มใหม่ตรงนี้ */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-foreground/70 hover:text-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation(); // กัน event ไหลซ้อนตัวแถว
+                          if (setEditItem) setEditItem(d); // ส่ง Object ของอุปกรณ์กลับไปที่ Parent component
+                        }}
+                      >
+                        <Pencil size={14} />
+                      </Button>
+
+                      {/* 3. ปุ่ม Delete (ส่งลบ/ขออนุมัติลบ) */}
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteId(d.id)}
+                        disabled={d.status === 'รออนุมัติลบ'} 
+                        onClick={(e) => {
+                          e.stopPropagation(); 
+                          setDeleteId(d.id); 
+                        }}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={14} className={d.status === 'รออนุมัติลบ' ? 'opacity-30' : ''} />
                       </Button>
                     </div>
                   </td>

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { LayoutDashboard, Monitor, Wrench, PackageOpen, LogOut, Server, ClipboardCheck } from 'lucide-react';
+// 1. ➕ นำเข้าไอคอน History เข้ามาใช้งานร่วมกับตัวอื่นๆ
+import { LayoutDashboard, Monitor, Wrench, PackageOpen, LogOut, Server, ClipboardCheck, History } from 'lucide-react';
 
 // เมนูพื้นฐานสำหรับพนักงานทุกคน
 const baseNavItems = [
@@ -20,26 +21,16 @@ export default function Layout() {
     const checkUserRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // 🛠️ เงื่อนไขเช็กสิทธิ์แอดมิน (สามารถเปลี่ยนตามโครงสร้างฐานข้อมูลของคุณได้)
-      // ตัวอย่างที่ 1: เช็กจาก metadata ตอนสมัครสมาชิก
       const userRole = user?.user_metadata?.role; 
-      
-      // ตัวอย่างที่ 2: ถ้าคุณเก็บสิทธิ์ไว้ในตาราง profiles แยกต่างหาก ให้เปิดใช้คอมเมนต์ด้านล่างนี้:
-      /*
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user?.id)
-        .single();
-      const userRole = profile?.role;
-      */
 
-      if (userRole === 'admin' || user?.email === 'admin@yourdomain.com') { // ใส่ fallback เช็กเมลทดสอบได้
+      if (userRole === 'admin' || user?.email === 'admin@yourdomain.com') { 
         setIsAdmin(true);
-        // ถ้าเป็นแอดมิน ให้ต่อเมนู "งานรออนุมัติ" เพิ่มเข้าไปใน Sidebar
+        
+        // 2. ➕ เพิ่มเมนู History ต่อท้าย "งานรออนุมัติ" ในกรณีที่เป็นสิทธิ์ Admin
         setNavItems([
           ...baseNavItems,
-          { label: 'งานรออนุมัติ', path: '/approve', icon: ClipboardCheck } // เมนูใหม่สำหรับแอดมิน
+          { label: 'งานรออนุมัติ', path: '/approve', icon: ClipboardCheck },
+          { label: 'History', path: '/history', icon: History } // เมนูใหม่ต่อท้ายวงสีแดงตามต้องการ 🎯
         ]);
       }
     };
