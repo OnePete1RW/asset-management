@@ -29,7 +29,7 @@ export default function GodexPrintButton({ form }) {
         onClick={handlePrint}
       >
         <Printer size={13} />
-        <span>พิมพ์สติกเกอร์ GoDEX</span>
+        <span>พิมพ์สติกเกอร์</span>
       </Button>
 
       {/* 2. ฟอร์มดีไซน์สติกเกอร์ (ซ่อนไว้บนหน้าเว็บปกติ จะแสดงผลเฉพาะตอนกดพิมพ์) */}
@@ -108,13 +108,13 @@ export default function GodexPrintButton({ form }) {
             <div className="sticker-header">
               🏢 IT ASSET MANAGEMENT
             </div>
-            
             <div className="sticker-content">
-              {/* ฝั่งซ้าย: แสดงรายละเอียดอุปกรณ์ */}
               <div className="sticker-details">
-                <div className="detail-item"><strong>Name:</strong> {form?.name || '—'}</div>
-                <div className="detail-item"><strong>Dept:</strong> {form?.department || '—'}</div>
-                <div className="detail-item"><strong>Type:</strong> {form?.category || '—'}</div>
+                <div className='detail-item'><strong>รหัสอุปกรณ์ : </strong>{form?.asset_tag}</div>
+                <div className="detail-item"><strong>ชื่ออุปกรณ์ : </strong> {form?.name || '—'}</div>
+                <div className="detail-item"><strong>แผนก : </strong> {form?.department || '—'}</div>
+                <div className="detail-item"><strong>ประเภท : </strong> {form?.category || '—'}</div>
+                <div className='detail-item'><strong>วันหมดประกัน : </strong>{form?.purchase_date}</div>
               </div>
 
               {/* ฝั่งขวา: เจนรูป QR Code จากรหัส Asset Tag */}
