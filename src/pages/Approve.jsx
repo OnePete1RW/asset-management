@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ClipboardCheck, Check, X, Filter, Search, AlertCircle, Laptop, Trash2, RefreshCw, Pencil } from 'lucide-react';
+import { ClipboardCheck, Check, X, Filter, Search, RefreshCw, Laptop, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 
 // สีกำกับประเภทคำขอ (Request Type)
 const typeDetails = {
@@ -15,47 +13,133 @@ const typeDetails = {
   Delete: { label: 'ลบอุปกรณ์', bg: 'rgba(239,68,68,0.12)', color: '#ef4444', icon: Trash2 },
 };
 
-const priorityColors = {
-  Low: { bg: 'rgba(107,114,128,0.12)', color: '#6b7280' },
-  Medium: { bg: 'rgba(59,130,246,0.12)', color: '#3b82f6' },
-  High: { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b' },
-  Critical: { bg: 'rgba(239,68,68,0.12)', color: '#ef4444' },
-};
-
 export default function Approve() {
   const [approvals, setApprovals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('all');
-  const [actionItem, setActionItem] = useState(null);
-  const [rejectNotes, setRejectNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [user, setUser] = useState(null);
 
-  // ดึงข้อมูลคำขอที่สถานะยังเป็น 'Pending' (รออนุมัติ)
+  // 🔍 ฟังก์ชันแกะประวัติและเรนเดอร์ฟิลด์เปลี่ยนค่าแบบ Inline CSS กันปัญหาสีไม่ขึ้น
+  const renderChangedFields = (noteString) => {
+    if (!noteString) return null;
+
+    let payload = {};
+    try {
+      // 🔄 ดึงข้อความในวงเล็บปีกกา { ... } ออกมาจาก String หมายเหตุ
+      const jsonMatch = noteString.match(/\{([\s\S]*)\}/);
+      if (!jsonMatch) return null;
+      payload = JSON.parse(jsonMatch[0]);
+    } catch (e) {
+      console.error("Error parsing note JSON in renderChangedFields:", e);
+      return null;
+    }
+
+    const labels = {
+      asset_tag: "Asset Tag",
+      name: "ชื่ออุปกรณ์",
+      category: "ประเภท",
+      department: "แผนก",
+      assigned_to: "ผู้รับผิดชอบ",
+      status: "สถานะ",
+      purchase_date: "วันที่ซื้อ",
+      warranty_expire: "วันหมดประกัน",
+      brand: "ยี่ห้อ",
+      model: "รุ่น",
+      serial_number: "Serial Number"
+    };
+
+    const changes = [];
+
+    // วนลูปแปลงโครงสร้างให้อยู่ในรูปแบบ { old, new } และคัดเฉพาะฟิลด์ที่มีการเปลี่ยนแปลงจริง
+    Object.keys(labels).forEach((key) => {
+      const newValue = payload[key] !== undefined && payload[key] !== null ? String(payload[key]).trim() : '';
+      const oldValue = payload[`original_${key}`] !== undefined && payload[`original_${key}`] !== null ? String(payload[`original_${key}`]).trim() : '';
+
+      if (newValue !== oldValue && (newValue || oldValue)) {
+        changes.push({
+          key,
+          label: labels[key],
+          old: oldValue || "—",
+          new: newValue || "—"
+        });
+      }
+    });
+
+    if (changes.length === 0) return null;
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', marginTop: '6px' }}>
+        {changes.map((changeItem) => (
+          <div
+            key={changeItem.key}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px', 
+              padding: '6px 10px', 
+              backgroundColor: '#f8fafc', 
+              borderRadius: '6px', 
+              border: '1px solid #e2e8f0',
+              width: '100%'
+            }}
+          >
+            {/* ป้ายชื่อแอตทริบิวต์ */}
+            <div style={{ width: '100px', flexShrink: 0 }}>
+              <span style={{ 
+                backgroundColor: '#e2e8f0', 
+                padding: '2px 6px', 
+                borderRadius: '4px', 
+                color: '#334155', 
+                fontWeight: '600', 
+                fontSize: '11px',
+                display: 'block',
+                textAlign: 'center'
+              }}>
+                {changeItem.label}
+              </span>
+            </div>
+
+            {/* ส่วนแสดงค่าเก่า -> ค่าใหม่ */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ textDecoration: 'line-through', color: '#ef4444', backgroundColor: '#fef2f2', padding: '2px 6px', borderRadius: '4px', fontWeight: '500' }}>
+                {changeItem.old}
+              </span>
+              
+              <span style={{ color: '#3b82f6', fontFamily: 'monospace', fontSize: '11px' }}>➡️</span>
+              
+              <span style={{ color: '#16a34a', backgroundColor: '#f0fdf4', padding: '2px 6px', borderRadius: '4px', fontWeight: '600' }}>
+                {changeItem.new}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // ดึงข้อมูลจาก Supabase
   const loadApprovals = async () => {
     try {
       setLoading(true);
-
-      // 1. ดึงคำขอทั้งหมดที่รออนุมัติ
       const { data: approvalsData, error: appErr } = await supabase
         .from('approvals')
         .select('*')
-        .eq('status', 'Pending')
+        .or('status.eq.Pending,status.eq.pending')
         .order('created_at', { ascending: false });
 
       if (appErr) throw appErr;
 
-      // 2. ดึงข้อมูลอุปกรณ์ทั้งหมดมาเพื่อเอาไป Map ข้อมูล (เลือกเฉพาะคอลัมน์ที่ต้องใช้)
       const { data: devicesData } = await supabase
         .from('devices')
         .select('id, asset_tag, name, assigned_to');
 
-      // 3. รวมข้อมูลด้วย JavaScript (เชื่อมข้อมูลโดยใช้ device_id)
       const combinedData = approvalsData.map(app => {
         const relatedDevice = devicesData?.find(dev => dev.id === app.device_id);
         return {
           ...app,
-          devices: relatedDevice || null // ถ้าหาไม่เจอให้เป็น null
+          devices: relatedDevice || null
         };
       });
 
@@ -67,125 +151,113 @@ export default function Approve() {
     }
   };
 
-  useEffect(() => {
-    loadApprovals();
-  }, []);
-
-  // ค้นหาและคัดกรองข้อมูลในฝั่ง Client
+  // ค้นหาฝั่ง Client
   const filtered = approvals.filter(item => {
     const matchSearch = !search ||
       item.device_name?.toLowerCase().includes(search.toLowerCase()) ||
+      item.devices?.name?.toLowerCase().includes(search.toLowerCase()) ||
       item.requested_by?.toLowerCase().includes(search.toLowerCase()) ||
       item.ticket_no?.toLowerCase().includes(search.toLowerCase());
-    const matchType = filterType === 'all' || item.request_type === filterType;
+
+    const matchType = filterType === 'all' || item.request_type?.toLowerCase() === filterType.toLowerCase();
     return matchSearch && matchType;
   });
 
-  // ฟังก์ชันกด "อนุมัติ"
-  // ฟังก์ชันเดียวสำหรับอนุมัติ
-  const handleApprove = async (item) => {
+  // ฟังก์ชันกดปุ่มอนุมัติ
+  const handleApproveDirect = async (item) => {
+    setSubmitting(true);
     try {
-      setSubmitting(true);
+      if (item.request_type === 'Delete') {
+        const { error: deviceDeleteErr } = await supabase
+          .from('devices')
+          .delete()
+          .eq('id', item.device_id);
 
-      // 1. อัปเดตสถานะในตาราง approvals
-      const { error: approveErr } = await supabase
-        .from('approvals')
-        .update({ status: 'Approved' })
-        .eq('id', item.id);
-      if (approveErr) throw approveErr;
+        if (deviceDeleteErr) throw deviceDeleteErr;
 
-      // 2. จัดการตาราง devices ตามประเภท
-      if (item.request_type === 'Repair') {
-        await supabase.from('devices').update({ status: 'กำลังซ่อม' }).eq('id', item.device_id);
-      } else if (item.request_type === 'Move') {
-        await supabase.from('devices').update({ location: item.new_location }).eq('id', item.device_id);
-      } else if (item.request_type === 'Delete') {
-        // *** จุดสำคัญ: ตรงนี้คือที่ที่คุณต้องการให้ข้อมูลหายไป ***
-        // ถ้าต้องการ "ลบออกจากระบบจริง" ให้ใช้:
-        await supabase.from('devices').delete().eq('id', item.device_id);
+        const { error: approvalDeleteErr } = await supabase
+          .from('approvals')
+          .delete()
+          .eq('id', item.id);
 
-        // หรือถ้าต้องการแค่ "เปลี่ยนสถานะว่าลบแล้ว" ให้ใช้:
-        // await supabase.from('devices').update({ status: 'Deleted' }).eq('id', item.device_id);
+        if (approvalDeleteErr) throw approvalDeleteErr;
+
+        await loadApprovals();
+        alert("อนุมัติลบอุปกรณ์ออกจากระบบเสร็จสิ้น");
+        return;
       }
 
-      // 3. เอาออกจากหน้าจอ
-      setApprovals(prev => prev.filter(req => req.id !== item.id));
+      let updatedData = {};
+      if (item.note) {
+        const jsonMatch = item.note.match(/\{([\s\S]*)\}/);
+        if (jsonMatch) {
+          updatedData = JSON.parse(jsonMatch[0]);
+        } else {
+          throw new Error("ไม่พบโครงสร้างข้อมูลวัตถุ JSON ในหมายเหตุ");
+        }
+      } else {
+        throw new Error("ไม่พบข้อมูลชุดใหม่ในคำขออนุมัติ");
+      }
 
+      const deviceUpdates = {
+        asset_tag: updatedData.asset_tag,
+        name: updatedData.name,
+        category: updatedData.category,
+        department: updatedData.department,
+        assigned_to: updatedData.assigned_to,
+        purchase_date: updatedData.purchase_date,
+        warranty_expire: updatedData.warranty_expire,
+        status: 'ใช้งาน'
+      };
+
+      const { error: deviceError } = await supabase
+        .from('devices')
+        .update(deviceUpdates)
+        .eq('id', item.device_id);
+
+      if (deviceError) throw deviceError;
+
+      const { error: deleteError } = await supabase
+        .from('approvals')
+        .delete()
+        .eq('id', item.id);
+
+      if (deleteError) throw deleteError;
+
+      await loadApprovals();
+      alert("อนุมัติการแก้ไขข้อมูลและปรับสถานะเป็น 'ใช้งาน' เรียบร้อยแล้ว");
     } catch (err) {
-      console.error("Approve failed:", err.message);
+      console.error("Error during approval:", err);
+      alert("เกิดข้อผิดพลาดในการอนุมัติคำขอ: " + err.message);
     } finally {
       setSubmitting(false);
     }
   };
 
-  // ฟังก์ชันส่งข้อมูล "ปฏิเสธ/ไม่อนุมัติ" (มีอันเดียว ไม่ซ้ำแล้ว)
-  // const handleRejectSubmit = async () => {
-  //   if (!actionItem) return;
+  const handleRejectDirect = async (item) => {
+    setSubmitting(true);
+    try {
+      const originalStatus = item.payload?.status || 'ใช้งาน';
 
-  //   try {
-  //     setSubmitting(true);
+      await supabase
+        .from('devices')
+        .update({ status: originalStatus })
+        .eq('id', item.device_id);
 
-  //     // 1. อัปเดตตารางอนุมัติเป็น Rejected
-  //     await supabase
-  //       .from('approvals')
-  //       .update({ status: 'Rejected', notes: rejectNotes || 'ปฏิเสธการอนุมัติ' })
-  //       .eq('id', actionItem.id);
+      await supabase
+        .from('approvals')
+        .delete()
+        .eq('id', item.id);
 
-  //     // 2. คืนค่าสถานะอุปกรณ์ให้กลับไปเป็นแบบเดิม
-  //     if (actionItem.request_type === 'Move') {
-  //       // คืนค่าแผนกเดิม (ถ้าใน approvals คุณเก็บ previous_dept ไว้)
-  //       await supabase.from('devices')
-  //         .update({ department: actionItem.previous_dept })
-  //         .eq('id', actionItem.device_id);
-
-  //     } else if (actionItem.request_type === 'Repair') {
-  //       // ถ้าปฏิเสธการซ่อม ให้คืนสถานะเป็น 'ใช้งาน' (หรือสถานะปกติ)
-  //       await supabase.from('devices')
-  //         .update({ status: 'ใช้งาน' })
-  //         .eq('id', actionItem.device_id);
-  //     }
-  //     // เพิ่มเงื่อนไขอื่นๆ ตามต้องการ...
-
-  //     setMessage("ปฏิเสธคำขอและคืนสถานะอุปกรณ์เรียบร้อยแล้ว");
-  //     setRejectNotes('');
-  //     setActionItem(null);
-  //     await loadApprovals();
-  //   } catch (err) {
-  //     setMessage("เกิดข้อผิดพลาด: " + err.message);
-  //   } finally {
-  //     setSubmitting(false);
-  //   }
-  // };
-const handleRejectDirect = async (item) => {
-  setSubmitting(true); // เปลี่ยนสถานะให้ปุ่มขึ้นว่า "กำลังบันทึก"
-
-  try {
-    // 1. อัปเดตสถานะการอนุมัติ
-    // (ถ้ายังไม่มีคอลัมน์ status ให้ใช้การ .delete() แทนตามที่คุยกันครับ)
-    await supabase
-      .from('approvals')
-      .delete() // ถ้าไม่มี status ให้ใช้ delete เพื่อจบรายการ
-      .eq('id', item.id);
-
-    // 2. คืนค่าสถานะอุปกรณ์กลับไปเป็น 'ใช้งาน' หรือค่าเดิม
-    await supabase
-      .from('devices')
-      .update({ status: 'ใช้งาน' }) 
-      .eq('id', item.device_id);
-
-    // 3. รีเฟรชหน้าตาราง
-    await loadApprovals();
-    
-    // แจ้งเตือนสั้นๆ (ถ้ามีระบบ Toast)
-    // setMessage("ปฏิเสธรายการสำเร็จ");
-  } catch (err) {
-    console.error("Error:", err);
-    alert("เกิดข้อผิดพลาดในการปฏิเสธ");
-  } finally {
-    setSubmitting(false); // ปิดสถานะการโหลด
-  }
-};
-  const [user, setUser] = useState(null);
+      await loadApprovals();
+      alert(`ปฏิเสธรายการเรียบร้อยแล้ว`);
+    } catch (err) {
+      console.error("Error during rejection:", err);
+      alert("เกิดข้อผิดพลาดในการปฏิเสธคำขอ");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     const getUser = async () => {
@@ -194,7 +266,8 @@ const handleRejectDirect = async (item) => {
     };
     getUser();
     loadApprovals();
-  }, [])
+  }, []);
+
   return (
     <div className="space-y-5">
       {/* ส่วนหัวหน้าจอ */}
@@ -210,7 +283,7 @@ const handleRejectDirect = async (item) => {
         </div>
       </div>
 
-      {/* แถบค้นหาและฟิลเตอร์ */}
+      {/* แถบค้นหา */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-48">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -251,44 +324,76 @@ const handleRejectDirect = async (item) => {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">ชื่ออุปกรณ์</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">ผู้ถือครอง</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">บัญชีผู้ดำเนินการ</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">ประเภททำรายการ</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">รายละเอียดประวัติการเปลี่ยนค่า</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase">การจัดการ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 {filtered.map((item) => {
-                  const type = typeDetails[item.request_type] || { label: item.request_type, color: '#6b7280' };
-
                   return (
                     <tr key={item.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 font-medium text-foreground">{item.devices?.asset_tag || '—'}</td>
                       <td className="px-4 py-3 text-foreground">{item.devices?.name || item.device_name}</td>
                       <td className="px-4 py-3 text-muted-foreground">{item.devices?.assigned_to || '—'}</td>
-
-                      {/* บัญชีผู้ดำเนินการ */}
                       <td className="px-4 py-3 text-sm text-foreground">{user?.email || 'System'}</td>
+                      
+                      {/* คอลัมน์แสดงรายละเอียดประวัติการแก้ไข */}
+                      <td className="px-4 py-3 max-w-xl">
+                        <div className="flex flex-col gap-1 text-xs">
+                          {item.request_type === 'Edit' ? (
+                            <div className="space-y-2 w-full">
+                              {/* รายละเอียดงานหลัก */}
+                              <div className="leading-relaxed">
+                                <span className="text-muted-foreground font-medium">รายละเอียดงาน: </span>
+                                <span className="text-foreground font-semibold break-words">
+                                  {item.note?.split("{")[0]
+                                    ?.replace("ขอแก้ไขข้อมูลอุปกรณ์:", "")
+                                    ?.replace("รายละเอียดงาน:", "")
+                                    ?.replace("| ข้อมูลใหม่:", "")
+                                    ?.trim() || "เปลี่ยนสถานะอุปกรณ์"}
+                                </span>
+                              </div>
 
-                      {/* ประเภททำรายการ (แยกออกมาตาม image_213707.png) */}
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-blue-600 uppercase">{type.label}</span>
-                          <span className="text-xs text-muted-foreground">{item.description || 'ไม่มีรายละเอียด'}</span>
+                              {/* บล็อกกรอบเส้นประมินิมอลตามที่คุณกำหนด */}
+                              <div className="p-3 rounded-xl border border-dashed border-muted-foreground/30 bg-card" style={{ padding: '12px', borderRadius: '12px', border: '1px dashed #cbd5e1', backgroundColor: '#fafafa' }}>
+                                <p className="text-xs font-bold mb-2 flex items-center gap-1 text-slate-500">
+                                  <span>🔍 ข้อมูลที่เปลี่ยนแปลง:</span>
+                                </p>
+                                {renderChangedFields(item.note)}
+                              </div>
+                            </div>
+                          ) : (
+                            // คำขอประเภทอื่น ๆ (ซ่อม, ย้าย, ลบ)
+                            <div className="leading-relaxed">
+                              <span className="text-muted-foreground font-medium">รายละเอียดงาน: </span>
+                              <span className={item.request_type === 'Delete' ? "text-red-600 font-semibold break-words" : "text-foreground font-semibold break-words"}>
+                                {item.request_type === 'Repair' && `[แจ้งซ่อม] `}
+                                {item.request_type === 'Move' && `[เคลื่อนย้าย] `}
+                                {item.request_type === 'Delete' && `[ขออนุมัติลบ] `}
+                                {item.description || item.note || '—'}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </td>
 
-                      {/* การจัดการ */}
+                      {/* ปุ่มกดจัดการด้านหลัง */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={() => handleApprove(item)}>
-                            <Check size={12} className="mr-1" /> อนุมัติ
+                          <Button
+                            size="sm"
+                            className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700"
+                            onClick={() => handleApproveDirect(item)}
+                            disabled={submitting}
+                          >
+                            {submitting ? 'กำลังบันทึก...' : <><Check size={12} className="mr-1" /> อนุมัติ</>}
                           </Button>
-                          {/* เปลี่ยนจาก setActionItem เป็นการเรียกฟังก์ชันโดยตรง */}
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 text-xs text-red-600 border-red-200"
-                            onClick={() => handleRejectDirect(item)} // เรียกฟังก์ชันใหม่ที่ไม่มี Dialog
-                            disabled={submitting} // ปุ่มจะกดซ้ำไม่ได้ขณะกำลังบันทึก
+                            className="h-7 text-xs text-red-600 border-red-200 hover:bg-red-50"
+                            onClick={() => handleRejectDirect(item)}
+                            disabled={submitting}
                           >
                             {submitting ? 'กำลังปฏิเสธ...' : <><X size={12} className="mr-1" /> ปฏิเสธ</>}
                           </Button>

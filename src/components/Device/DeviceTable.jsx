@@ -9,7 +9,7 @@ export default function DeviceTable({
   statusColors,
   setDetailItem,
   setEditItem, // ➕ เพิ่มฟังก์ชันสำหรับรับค่าเพื่อแก้ไขข้อมูลเครื่อง
-  setDeleteId 
+  setDeleteId
 }) {
   // สถานะกำลังโหลด
   if (loading) {
@@ -121,7 +121,7 @@ export default function DeviceTable({
                         size="icon"
                         className="h-8 w-8"
                         onClick={(e) => {
-                          e.stopPropagation(); 
+                          e.stopPropagation();
                           setDetailItem(d);
                         }}
                       >
@@ -142,17 +142,23 @@ export default function DeviceTable({
                       </Button>
 
                       {/* 3. ปุ่ม Delete (ส่งลบ/ขออนุมัติลบ) */}
+                      {/* 3. ปุ่ม Delete (ส่งลบ/ขออนุมัติลบ) */}
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
-                        disabled={d.status === 'รออนุมัติลบ'} 
+                        // 🔒 ล็อกปุ่มไม่ให้กดเพิ่ม ถ้าสถานะเป็น 'รออนุมัติลบ' หรือ 'รออนุมัติแก้ไข'
+                        disabled={d.status === 'รออนุมัติลบ' || d.status === 'รออนุมัติแก้ไข'}
                         onClick={(e) => {
-                          e.stopPropagation(); 
-                          setDeleteId(d.id); 
+                          e.stopPropagation();
+                          setDeleteId(d.id);
                         }}
                       >
-                        <Trash2 size={14} className={d.status === 'รออนุมัติลบ' ? 'opacity-30' : ''} />
+                        <Trash2
+                          size={14}
+                          // 🎨 ทำให้ไอคอนจางลงเมื่อถูกล็อก
+                          className={(d.status === 'รออนุมัติลบ' || d.status === 'รออนุมัติแก้ไข') ? 'opacity-30 cursor-not-allowed' : ''}
+                        />
                       </Button>
                     </div>
                   </td>

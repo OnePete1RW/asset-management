@@ -8,7 +8,6 @@ import { supabase } from '@/lib/supabase';
 import ImageCropDialog from './ImageCropDialog';
 import ImageUploader from './ImageUploader';
 import { Laptop, AlertCircle } from 'lucide-react';
-
 export default function DeviceFormDialog({
   isOpen,
   setIsOpen,
@@ -30,11 +29,9 @@ export default function DeviceFormDialog({
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
-
   const handleImageChangeLocal = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = () => {
       setImageSrc(reader.result);
@@ -42,18 +39,14 @@ export default function DeviceFormDialog({
     };
     reader.readAsDataURL(file);
   };
-
   const saveCropLocal = async () => {
     if (!croppedAreaPixels || !imageSrc) return;
-
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
     canvas.width = 300;
     canvas.height = 300;
-
     const image = new Image();
     image.src = imageSrc;
-
     image.onload = async () => {
       ctx.drawImage(
         image,
@@ -66,7 +59,6 @@ export default function DeviceFormDialog({
         300,
         300
       );
-
       canvas.toBlob(async (blob) => {
         const fileName = `${Date.now()}.png`;
         const { error } = await supabase.storage
@@ -77,17 +69,14 @@ export default function DeviceFormDialog({
           alert("อัปโหลดรูปภาพล้มเหลว: " + error.message);
           return;
         }
-
         const { data: { publicUrl } } = supabase.storage
           .from("device-images")
           .getPublicUrl(fileName);
-
         setForm(f => ({ ...f, image_url: publicUrl }));
         setCropDialogOpen(false);
       });
     };
   };
-
   const validateAndSave = () => {
     const localErrors = {};
 
@@ -109,15 +98,16 @@ export default function DeviceFormDialog({
     if (!form.department || form.department.trim() === "") {
       localErrors.department = "กรุณาเลือกแผนก";
     }
-
+    // ➕ เช็ค Validate ช่องบริษัท (ถ้าจำเป็นต้องกรอก เอาคอมเมนต์ออกได้ครับ)
+    if (!form.company || form.company.trim() === "") {
+      localErrors.company = "กรุณากรอกชื่อบริษัท";
+    }
     if (Object.keys(localErrors).length > 0) {
       setErrors(localErrors);
       return;
     }
-
     handleSave();
   };
-
   const handleCancel = () => {
     setErrors({});
     const hasData = Object.values(form).some(value => value && value.toString().trim() !== "");
@@ -127,7 +117,6 @@ export default function DeviceFormDialog({
       setIsOpen(false);
     }
   };
-
   return (
     <Dialog
       open={isOpen}
@@ -146,7 +135,6 @@ export default function DeviceFormDialog({
           boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)'
         }}
       >
-
         {/* ส่วนหัว */}
         <DialogHeader className="border-b pb-3 shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base font-bold tracking-tight text-foreground">
@@ -156,10 +144,8 @@ export default function DeviceFormDialog({
             <span>เพิ่มอุปกรณ์ใหม่</span>
           </DialogTitle>
         </DialogHeader>
-
         {/* ส่วนเนื้อหาฟอร์ม */}
         <div className="flex-1 my-3 space-y-4 overflow-hidden w-full">
-
           {/* ส่วนอัปโหลดรูปภาพ */}
           <div className="flex flex-col items-center justify-center bg-muted/5 py-3 px-4 rounded-xl border border-dashed w-full max-h-[130px]">
             <div className="scale-90 transform origin-center">
@@ -169,12 +155,10 @@ export default function DeviceFormDialog({
               />
             </div>
           </div>
-
-          {/* แผงกรอกข้อมูลหลัก */}
+          {/* แถวที่ 0:แผงกรอกข้อมูลหลัก */}
           <div className="bg-background rounded-xl border p-4 shadow-sm w-full">
             <div className="grid grid-cols-2 gap-x-5 gap-y-1">
-
-              {/* แถวที่ 1: รหัสอุปกรณ์ | ชื่ออุปกรณ์ */}
+              {/* แถวที่ 1:รหัสอุปกรณ์*/}
               <div className="w-full">
                 <Label className={`text-[11px] font-bold ${errors.asset_tag ? "text-red-500" : "text-foreground/80"}`}>รหัสอุปกรณ์</Label>
                 <Input
@@ -194,7 +178,7 @@ export default function DeviceFormDialog({
                   )}
                 </div>
               </div>
-
+              {/*แถวที่ 2:ชื่ออุปกรณ์*/}
               <div className="w-full">
                 <Label className={`text-[11px] font-bold ${errors.name ? "text-red-500" : "text-foreground/80"}`}>ชื่ออุปกรณ์</Label>
                 <Input
@@ -214,7 +198,7 @@ export default function DeviceFormDialog({
                   )}
                 </div>
               </div>
-
+              {/*แถวที่ 3:ผู้รับมอบหมาย*/}
               <div className="w-full">
                 <Label className={`text-[11px] font-bold ${errors.assigned_to ? "text-red-500" : "text-foreground/80"}`}>ผู้ได้รับมอบหมาย</Label>
                 <Input
@@ -234,8 +218,7 @@ export default function DeviceFormDialog({
                   )}
                 </div>
               </div>
-              {/* แถวที่ 2: สถานะการใช้งาน (แก้ไขตัวเลือกเป็น: ใช้งานปกติ และ สำรอง) */}
-
+              {/*แถวที่ 4:แผนก */}
               <div className="w-full">
                 <Label className={`text-[11px] font-bold ${errors.department ? "text-red-500" : "text-foreground/80"}`}>ฝ่าย / แผนก</Label>
                 <div className="mt-1">
@@ -257,6 +240,7 @@ export default function DeviceFormDialog({
                   )}
                 </div>
               </div>
+              {/*แถวที่ 5:ประเภทการใช้งาน*/}
               <div className="w-full">
                 <Label className={`text-[11px] font-bold ${errors.category ? "text-red-500" : "text-foreground/80"}`}>ประเภทอุปกรณ์</Label>
                 <div className="mt-1">
@@ -278,6 +262,7 @@ export default function DeviceFormDialog({
                   )}
                 </div>
               </div>
+              {/*แถวที่ 6:สถานะการใช้งาน*/}
               <div className="w-full">
                 <Label className={`text-[11px] font-bold ${errors.status ? "text-red-500" : "text-foreground/80"}`}>สถานะการใช้งาน</Label>
                 <div className="mt-1">
@@ -286,7 +271,6 @@ export default function DeviceFormDialog({
                       <SelectValue placeholder={errors.status ? errors.status : "เลือกสถานะ"} />
                     </SelectTrigger>
                     <SelectContent className="rounded-lg">
-                      {/* 🛠️ กรองเอาเฉพาะ 'ใช้งานปกติ' และ 'สำรอง' มาแสดงเป็นตัวเลือกในการเพิ่มอุปกรณ์ */}
                       {statuses
                         .filter(s => s === 'สำรอง' || s === 'ใช้งาน')
                         .map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)
@@ -303,20 +287,18 @@ export default function DeviceFormDialog({
                   )}
                 </div>
               </div>
-              {/* แถวที่ 3: ประเภทอุปกรณ์ | ฝ่าย / แผนก */}
-
-              {/* แถวที่ 4: วันที่ซื้ออุปกรณ์ | วันหมดประกัน */}
+              {/*แถวที่ 7:วันที่ซื้ออุปกรณ์*/}
               <div className="w-full border-t border-dashed pt-2 mt-1">
-                <Label className="text-[11px] font-bold text-foreground/80 flex items-center gap-1">วันที่ซื้ออุปกรณ์</Label>
+                <Label className={`text-[11px] font-bold flex items-center gap-1 ${errors.warranty_expire ? "text-red-500" : "text-foreground/80"}`}>วันหมดประกัน</Label>
                 <Input
                   type="date"
                   value={form.purchase_date || ""}
-                  className="mt-1 h-8 text-xs rounded-md focus-visible:ring-primary font-mono"
-                  onChange={(e) => { setForm(f => ({ ...f, purchase_date: e.target.value })); setErrors(prev => ({ ...prev, warranty_expire: "" })); }}
+                  className={`mt-1 h-8 text-xs rounded-md font-mono transition-colors ${errors.purchase_date ? "border-red-500 bg-red-50/20 text-red-500 focus-visible:ring-red-500" : "focus-visible:ring-primary"}`}
+                  onChange={(e) => { setForm(f => ({ ...f, purchase_date: e.target.value })); setErrors(prev => ({ ...prev, purchase_date: "" })); }}
                 />
                 <div className="min-h-[16px]" />
               </div>
-
+              {/*แถวที่ 8:วันหมดประกัน */}
               <div className="w-full border-t border-dashed pt-2 mt-1">
                 <Label className={`text-[11px] font-bold flex items-center gap-1 ${errors.warranty_expire ? "text-red-500" : "text-foreground/80"}`}>วันหมดประกัน</Label>
                 <Input
@@ -334,12 +316,52 @@ export default function DeviceFormDialog({
                   )}
                 </div>
               </div>
-
+              {/* แถวล่างสุด: บริษัท */}
+              <div className="w-full border-t border-dashed pt-2 mt-1">
+                <Label className={`text-[11px] font-bold ${errors.company ? "text-red-500" : "text-foreground/80"}`}>บริษัท</Label>
+                <Input
+                  value={form.company || ""}
+                  placeholder={focusField === "company" ? "" : errors.company ? errors.company : "เช่น บริษัท เอบีซี จำกัด"}
+                  className={`mt-1 h-8 text-xs rounded-md transition-colors ${errors.company ? "border-red-500 bg-red-50/20 placeholder:text-red-400 focus-visible:ring-red-500" : ""}`}
+                  onFocus={() => { setFocusField("company"); setErrors(prev => ({ ...prev, company: "" })); }}
+                  onBlur={() => setFocusField("")}
+                  onChange={(e) => setForm(f => ({ ...f, company: e.target.value }))}
+                />
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.company && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.company}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+              {/* แถวล่างสุด:ผู้ติดต่อบริษัท */}
+              <div className="w-full border-t border-dashed pt-2 mt-1">
+                <Label className={`text-[11px] font-bold ${errors.company_contact ? "text-red-500" : "text-foreground/80"}`}>เบอร์ผู้ติดต่อบริษัท</Label>
+                <Input
+                  type="number" 
+                  value={form.company_contact || ""}
+                  placeholder={focusField === "company_contact" ? "" : errors.company_contact ? errors.company_contact : "เช่น 0812345678"}
+                  className={`mt-1 h-8 text-xs rounded-md transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${errors.company_contact ? "border-red-500 bg-red-50/20 placeholder:text-red-400 focus-visible:ring-red-500" : ""}`}
+                  onFocus={() => { setFocusField("company_contact"); setErrors(prev => ({ ...prev, company_contact: "" })); }}
+                  onBlur={() => setFocusField("")}
+                  onChange={(e) => setForm(f => ({ ...f, company_contact: e.target.value }))}
+                />
+                <div className="mt-0.5 min-h-[16px] flex items-center gap-1 text-red-500">
+                  {errors.company_contact && (
+                    <>
+                      <AlertCircle size={10} className="shrink-0" />
+                      <p className="text-[10px] font-semibold leading-none">{errors.company_contact}</p>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ส่วนปุ่มกด Actions ท้ายฟอร์ม */}
+        {/* ยกเลิก */}
         <div className="flex justify-end items-center gap-2 border-t pt-3 shrink-0">
           <Button
             className="hover:bg-[#111827] hover:text-white"
@@ -348,6 +370,7 @@ export default function DeviceFormDialog({
           >
             ยกเลิก
           </Button>
+          {/* บันทึก */}
           <Button
             className="hover:bg-[#111827] hover:text-white"
             variant="outline"
@@ -362,7 +385,7 @@ export default function DeviceFormDialog({
             ) : "บันทึกข้อมูล"}
           </Button>
         </div>
-
+        {/* ฟังค์ชั่น คอบรูป */}
         <ImageCropDialog
           isOpen={cropDialogOpen}
           setIsOpen={setCropDialogOpen}

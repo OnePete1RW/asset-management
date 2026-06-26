@@ -1,135 +1,78 @@
-import React, { useRef } from 'react';
-import { Button } from '@/components/ui/button';
+import React from 'react';
+import { QRCodeSVG } from 'qrcode.react'; // หรือไลบรารี QR Code ที่คุณใช้
 import { Printer } from 'lucide-react';
-// 🔹 Import ตัวเจน QR Code เข้ามาใช้งาน
-import { QRCodeSVG } from 'qrcode.react';
+import { Button } from '@/components/ui/button';
 
 export default function GodexPrintButton({ form }) {
-  const printAreaRef = useRef(null);
 
   const handlePrint = () => {
-    const printContent = printAreaRef.current.innerHTML;
-    const originalContent = document.body.innerHTML;
-
-    document.body.innerHTML = printContent;
     window.print();
-    
-    document.body.innerHTML = originalContent;
-    window.location.reload(); 
   };
 
   return (
     <>
-      {/* 1. ปุ่มกดสไตล์เดิม */}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="h-7 gap-1.5 text-xs font-semibold border-emerald-500/30 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
-        onClick={handlePrint}
-      >
-        <Printer size={13} />
-        <span>พิมพ์สติกเกอร์</span>
+      {/* ใส่ Style เพื่อควบคุมสิทธิ์หน้าพิมพ์ไม่ให้ข้อความหลุดซ้อน */}
+      <style>{`
+  /* หน้าจอปกติจะไม่เห็นกล่องสติกเกอร์นี้ */
+  @media screen {
+    #print-area { display: none; } 
+  }
+  
+  @media print {
+    /* 1. ซ่อนองค์ประกอบอื่นๆ ทั้งหมดบนหน้าเว็บ */
+    body * { visibility: hidden; }
+    
+    /* 2. แสดงเฉพาะพื้นที่สติกเกอร์ */
+    #print-area, #print-area * { visibility: visible; }
+    
+    /* 3. ล็อกตำแหน่งสติกเกอร์ไว้มุมซ้ายบนสุด */
+    #print-area {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100mm;
+      height: 75mm%;
+      box-sizing: border-box;
+      padding: 10px; /* เว้นระยะขอบสติกเกอร์เล็กน้อย */
+      background: white;
+    }
+
+    /* 4. 🎯 ตั้งค่าขนาดหน้ากระดาษสำหรับพิมพ์สติกเกอร์ (Sticker Size) */
+    @page {
+      size: auto;       /* ปล่อยให้ขนาดเป็นไปตามขนาดกระดาษที่ตั้งใน Driver เครื่องพิมพ์ */
+      margin: 0mm;      /* ลบขอบขาวส่วนเกินของเบราว์เซอร์ (หัวกระดาษ/ท้ายกระดาษ) */
+    }
+  }
+`}</style>
+
+      {/* ปุ่มกดสั่งพิมพ์หน้าระบบ */}
+      <Button onClick={handlePrint} className="flex items-center gap-1.5">
+        <Printer size={16} />
+        <span>พิมพ์บาร์โค้ด</span>
       </Button>
 
-      {/* 2. ฟอร์มดีไซน์สติกเกอร์ (ซ่อนไว้บนหน้าเว็บปกติ จะแสดงผลเฉพาะตอนกดพิมพ์) */}
-      <div style={{ display: 'none' }}>
-        <div ref={printAreaRef}>
-          <style>{`
-            @media print {
-              @page {
-                size: 76mm 50mm; /* ขนาดสติกเกอร์ กว้าง 7.6 ซม. สูง 5 ซม. */
-                margin: 0;
-              }
-              body {
-                margin: 0;
-                padding: 0;
-                background: #fff;
-                -webkit-print-color-adjust: exact;
-              }
-              .sticker-container {
-                width: 76mm;
-                height: 50mm;
-                padding: 5mm;
-                box-sizing: border-box;
-                display: flex;
-                flex-direction: column;
-                font-family: 'Inter', sans-serif, "Helvetica Neue", "Tahoma";
-                color: #000;
-              }
-              .sticker-header {
-                font-size: 13px;
-                font-weight: bold;
-                border-bottom: 2px solid #000;
-                padding-bottom: 3px;
-                letter-spacing: 0.5px;
-                text-align: center;
-              }
-              .sticker-content {
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                flex-grow: 1;
-                margin-top: 5px;
-                gap: 10px;
-              }
-              .sticker-details {
-                font-size: 11px;
-                line-height: 1.4;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                max-width: 65%;
-              }
-              .detail-item {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-              }
-              .qr-zone {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                min-width: 30%;
-              }
-              .asset-tag-text {
-                font-size: 11px;
-                font-weight: bold;
-                font-family: monospace;
-                margin-top: 4px;
-                letter-spacing: 0.5px;
-              }
-            }
-          `}</style>
+      {/* 🖨️ กล่องสำหรับส่งพิมพ์คอมพิวเตอร์ (พิมพ์ออกมาหน้าตาตามรูปสีขาวของคุณ) */}
+      <div id="print-area" className="flex flex-row items-center justify-between text-black" style={{ fontFamily: 'sans-serif', fontSize: '12px' }}>
 
-          {/* โครงสร้างเลย์เอาท์หน้าตาของตัวสติกเกอร์ */}
-          <div className="sticker-container">
-            <div className="sticker-header">
-              🏢 IT ASSET MANAGEMENT
-            </div>
-            <div className="sticker-content">
-              <div className="sticker-details">
-                <div className='detail-item'><strong>รหัสอุปกรณ์ : </strong>{form?.asset_tag}</div>
-                <div className="detail-item"><strong>ชื่ออุปกรณ์ : </strong> {form?.name || '—'}</div>
-                <div className="detail-item"><strong>แผนก : </strong> {form?.department || '—'}</div>
-                <div className="detail-item"><strong>ประเภท : </strong> {form?.category || '—'}</div>
-                <div className='detail-item'><strong>วันหมดประกัน : </strong>{form?.purchase_date}</div>
-              </div>
-
-              {/* ฝั่งขวา: เจนรูป QR Code จากรหัส Asset Tag */}
-              <div className="qr-zone">
-                <QRCodeSVG 
-                  value={form?.asset_tag || "000000"} 
-                  size={75} // ขนาดความกว้าง-สูงของ QR Code เป็นพิกเซล (พอดีกับสติกเกอร์ 50mm)
-                  level={"M"} // ระดับการฟื้นฟูข้อมูลมาตรฐาน (Medium) ช่วยให้สแกนง่ายขึ้นแม้พิมพ์บนสติกเกอร์ด่วน
-                />
-                {/* <div className="asset-tag-text">{form?.asset_tag || '000000'}</div> */}
-              </div>
-            </div>
+        {/* ฝั่งซ้าย: ข้อมูลรายละเอียดอุปกรณ์ (ลดขนาดตัวหนังสือลงเพื่อให้พอดีสติกเกอร์) */}
+        <div className="space-y-1 font-bold leading-tight flex-1 pr-2">
+          <div className="border-b border-black pb-1 mb-1 text-[11px] tracking-wide">
+            🏢 IT ASSET MANAGEMENT
           </div>
-
+          <p>รหัส: <span className="font-normal">{form.asset_tag || "-"}</span></p>
+          <p>ชื่อ: <span className="font-normal">{form.name || "-"}</span></p>
+          <p>แผนก: <span className="font-normal">{form.department || "-"}</span></p>
+          <p>ประเภท: <span className="font-normal">{form.category || "-"}</span></p>
         </div>
+
+        {/* ฝั่งขวา: QR Code สแกนดึงผู้ถือครอง */}
+        <div className="shrink-0 flex items-center justify-center pl-1">
+          <QRCodeSVG
+            value={`ผู้ถือครอง: ${form.assigned_to || 'ไม่ระบุ'} (${form.department || '-'})`}
+            size={85} /* ปรับขนาด QR Code ให้เหมาะกับสติกเกอร์ทั่วไป (ประมาณ 80-90px จะกำลังพอดี) */
+          />
+        </div>
+
       </div>
     </>
   );

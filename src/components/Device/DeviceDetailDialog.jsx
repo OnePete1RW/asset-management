@@ -2,19 +2,19 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Monitor, User, Calendar, ShieldCheck, Tag, Info } from 'lucide-react';
+import { Monitor, User, Calendar, ShieldCheck, Tag, Info, Building2 } from 'lucide-react'; // ➕ นำเข้า Building2 สำหรับไอคอนบริษัท
 import GodexPrintButton from '@/components/Device/GodexPrintButton';
 
 export default function DeviceDetailDialog({ isOpen, setIsOpen, detailItem, onPrintBarcode }) {
-  
+
   const handleClose = () => {
     setIsOpen(false);
   };
-
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto sm:rounded-2xl">
         <DialogHeader className="border-b pb-4">
+          {/*รายละเอียดอุปกรณ์ */}
           <DialogTitle className="flex items-center gap-2.5 text-xl font-bold tracking-tight">
             <div className="flex items-center gap-2 text-primary">
               <Monitor size={20} />
@@ -25,7 +25,7 @@ export default function DeviceDetailDialog({ isOpen, setIsOpen, detailItem, onPr
 
         {detailItem && (
           <div className="mt-4 w-full">
-            {/* ================== หน้ารายละเอียดอุปกรณ์ ================== */}\
+            {/* ================== หน้ารายละเอียดอุปกรณ์ ================== */}
             <div className="space-y-6 w-full">
               {/* ส่วนหัวภาพและการ์ดข้อมูลเบื้องต้น */}
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 bg-muted/20 p-4 rounded-2xl border w-full">
@@ -79,7 +79,7 @@ export default function DeviceDetailDialog({ isOpen, setIsOpen, detailItem, onPr
                 </div>
               </div>
 
-              {/* ข้อมูลการรับประกัน */}
+              {/* ข้อมูลการรับประกันและบริษัท */}
               <div className="bg-background rounded-xl border p-4 shadow-sm space-y-4 w-full">
                 <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
                   <ShieldCheck size={14} className="text-primary" />
@@ -100,20 +100,35 @@ export default function DeviceDetailDialog({ isOpen, setIsOpen, detailItem, onPr
                       {detailItem.warranty_expire || "—"}
                     </p>
                   </div>
+                  {/* ข้อมูลบริษัทและเบอร์ผู้ติดต่อ (แสดงผลคู่กันในแถวล่างสุด) */}
+                  <div className="w-full border-t border-dashed pt-3 mt-1">
+                    <Label className="text-muted-foreground text-xs font-medium">บริษัท</Label>
+                    <p className="mt-1 font-semibold text-sm bg-muted/40 px-3 py-2 rounded-lg border text-foreground/90 flex items-center gap-1.5 w-full truncate">
+                      <Building2 size={14} className="opacity-60 text-primary shrink-0" />
+                      {detailItem.company || "—"}
+                    </p>
+                  </div>
+
+                  <div className="w-full border-t border-dashed pt-3 mt-1">
+                    <Label className="text-muted-foreground text-xs font-medium">เบอร์ผู้ติดต่อบริษัท</Label>
+                    <p className="mt-1 font-semibold text-sm bg-muted/40 px-3 py-2 rounded-lg border text-foreground/90 flex items-center gap-1.5 w-full truncate">
+                      {detailItem.company_contact || "—"}
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* ส่วนปุ่มกดบริเวณท้าย Dialog */}
             <div className="flex justify-end items-center gap-2.5 mt-6 border-t pt-4">
-              <Button 
-                className="hover:bg-[#111827] hover:text-white" 
-                variant="outline" 
+              <Button
+                className="hover:bg-[#111827] hover:text-white"
+                variant="outline"
                 onClick={handleClose}
               >
                 ปิดหน้าต่าง
               </Button>
-              
+
               {/* 🖨️ ใส่ Component ปุ่มปริ้นบาร์โค้ดแทนที่ของเดิม */}
               <GodexPrintButton form={detailItem} onPrintBarcode={onPrintBarcode} />
             </div>
